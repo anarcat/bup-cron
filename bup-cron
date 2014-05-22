@@ -1,18 +1,13 @@
 #! /usr/bin/python
 
 # limitations
-# 1. should do fsck and maybe compare-tree
-# 2. some hardcoded stuff (-x, lvm snapshot size, snapshot
+# * should do fsck and maybe compare-tree
+# * some hardcoded stuff (-x, lvm snapshot size, snapshot
 # mountpoint...)
-# 3. quite verbose by default, should be silent with more noise when
-# more -v are applied
-# 4. logging handling should be improved: errors should be on stderr,
-# with logs on stdout or logfile. stderr should be copied to logfile
-# as well
-# 5. supports only LVM, assumes POSIX (so no Windows)
-# 6. see XXX below
-# 7. should have a lockfile
-# 8. should be unit tested, at this point it's grown too big
+# * should have a lockfile
+# * supports only LVM, assumes POSIX (so no Windows)
+# * should be unit tested, at this point it's grown too big
+# * see XXX below for more
 
 import os
 import sys
