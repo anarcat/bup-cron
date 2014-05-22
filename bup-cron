@@ -39,7 +39,7 @@ at least path and repo need to be specified
                                          epilog=self.epilog % " or ".join(self.configs),
                                          fromfile_prefix_chars='@')
         self.add_argument('-v', '--verbose', action='count',
-                         help='passed to bup')
+                         help='output more information on console. tries to be silent if not specified. -v implies explaining what we do, -vv shows output of commands, -vvv passes verbose to those commands')
         # using the hostname as branch name
         self.add_argument('-n', '--name', default=socket.gethostname(),
                             help='name of the backup passed to bup, defaults to hostname')
@@ -86,9 +86,6 @@ at least path and repo need to be specified
                     sys.argv.insert(1, '@' + conf)
             except IOError:
                 pass
-            else:
-                # XXX: should use log?
-                print('using config file %s' % conf)
         args = argparse.ArgumentParser.parse_args(self)
         # merge the path and paths arguments
         if args.path:
@@ -100,11 +97,21 @@ at least path and repo need to be specified
         del args.repository
         return args
 
+def logfmt(msg):
+    return "%s %s\n" % (time.ctime(), msg)
+
 def log(msg):
     """log message to stdout or logfile, depending on --log"""
     # XXX: we should log only if verbose > 0
     # also, errors should go on stderr no matter what, but also copied to log
-    args.log.write("%s %s\n" % (time.ctime(), msg))
+    if args.verbose > 0:
+        args.log.write(logfmt(msg))
+
+def warn(msg):
+    # if log is a file, copy there
+    if not args.log.isatty():
+        log(msg)
+    sys.stderr.write(logfmt(msg))
 
 def bail():
     """cleanup on exit"""
@@ -136,12 +143,15 @@ def init():
 
 def check_call_log(cmd):
     """call a procss, log it to the logfile and return false if it fails, otherwise true"""
-    # XXX: we should silence stdout if verbose < 1
     try:
-        log('calling `%s`' % " ".join(cmd))
-        subprocess.check_call(cmd, stdout=args.log, stderr=args.log)
+        log('calling command `%s`' % " ".join(cmd))
+        if args.verbose > 1:
+            stdout = args.log
+        else:
+            stdout = file(os.devnull)
+        subprocess.check_call(cmd, stdout=stdout, stderr=args.log)
     except subprocess.CalledProcessError:
-        log('command `%s` failed' % " ".join(cmd))
+        log('command failed')
         return False
     return True
 
@@ -176,7 +186,7 @@ def clean_lv():
     if args.snapshot and vg and lv:
         m = snapmount(snapname(lv))
         if os.path.ismount(m) and not check_call_log(['umount', m]):
-            log('failed to umount %s' % m)
+            warn('failed to umount %s' % m)
         try:
             log('removing directory %s' % m)
             os.removedirs(m)
@@ -184,9 +194,13 @@ def clean_lv():
             pass
         device = lvdev(vg, snapname(lv))
         try:
-            # XXX: should respect --verbose settings
-            if stat.S_ISBLK(os.stat(device).st_mode) and not check_call_log(['lvremove', '-f', device]):
-                log('failed to drop snapshot %s' % device)
+            cmd = ['lvremove', '-f', device]
+            if args.verbose < 1:
+                cmd += [ '-q' ]
+            if args.verbose > 1:
+                cmd += [ '-v' ]
+            if stat.S_ISBLK(os.stat(device).st_mode) and not check_call_log(cmd):
+                warn('failed to drop snapshot %s' % device)
         except OSError as e:
             # normal: the device doesn't exist, moving on
             return
@@ -218,8 +232,12 @@ try:
                     log('umounting and removing previous snapshot %s, if present (errors ignored)' % lvdev(vg, snapname(lv)))
                     clean_lv()
                     # XXX: snapshot size hardcoded
-                    # should respect --verbose settings
-                    if check_call_log(['lvcreate', '--size', '1GB', '--snapshot', '-n', snapname(lv), device]):
+                    cmd = ['lvcreate', '--size', '1GB', '--snapshot', '-n', snapname(lv), device]
+                    if args.verbose < 1:
+                        cmd += [ '-q' ]
+                    if args.verbose > 1:
+                        cmd += [ '-v' ]
+                    if check_call_log(cmd):
                         try:
                             os.chdir(snapmount(snapname(lv)))
                         except OSError:
@@ -228,16 +246,16 @@ try:
                         if check_call_log(['mount', lvdev(vg, snapname(lv)), snapmount(snapname(lv))]):
                             path = snapmount(snapname(lv))
                         else:
-                            log('failed to mount snapshot %s on %s, skipping snapshotting' % (snapname(lv), snapmount(snapname(lv))))
+                            warn('failed to mount snapshot %s on %s, skipping snapshotting' % (snapname(lv), snapmount(snapname(lv))))
                             lv = vg = None
                     else:
-                        log('failed to create snapshot for LV %s on VG %s, skipping snapshooting' % (lv, vg))
+                        warn('failed to create snapshot for LV %s on VG %s, skipping snapshooting' % (lv, vg))
                         lv = vg = None
                 else:
                     # XXX: we could try to find the parent mountpoint...
-                    log('%s is not a LVM mountpoint, skipping snapshotting' % path)
+                    warn('%s is not a LVM mountpoint, skipping snapshotting' % path)
             else:
-                log('%s is not a mountpoint, skipping snapshotting' % path)
+                warn('%s is not a mountpoint, skipping snapshotting' % path)
 
         # XXX: this shouldn't be in the loop like this, bup index should be
         # able to index multiple paths
@@ -246,20 +264,20 @@ try:
         log('indexing %s...' % path)
         # XXX: should be -q(uiet) unless verbose > 0 - but bup index has no -q
         cmd = ['bup', 'index']
-        if args.verbose > 0:
+        if args.verbose > 1:
             cmd += [ '-v' ]
         cmd += map((lambda ex: '--exclude-rx=' + ex), args.exclude)
         # XXX: -x hardcoded? -c and -t are apparently useful in case of
         # disaster
         cmd += [ '-x', path ]
         if not check_call_log(cmd):
-            log('skipping save!')
+            warn('skipping save because index failed!')
             clean_lv()
             continue
-        log('saving...')
+        log('saving')
         # XXX: should be -q(uiet) unless verbose > 0
         cmd = ['bup', 'save']
-        if args.verbose > 0:
+        if args.verbose > 1:
             cmd += [ '-v' ]
         # XXX: this should just be args.name, but we save once per path so
         # it's cleaner to group by path
@@ -269,7 +287,7 @@ try:
 except:
     # get exception type and error, but don't generate the traceback
     t, e = sys.exc_info()[:2]
-    log('aborting with %s exception: %s' % (t.__name__, e))
+    warn('aborting with %s exception: %s' % (t.__name__, e))
     # wait for bup to finish
     os.wait()
 finally:
