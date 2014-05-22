@@ -1,0 +1,270 @@
+#! /usr/bin/python
+
+# limitations
+# 1. should do fsck and maybe compare-tree
+# 2. some hardcoded stuff (-x, lvm snapshot size, snapshot
+# mountpoint...)
+# 3. quite verbose by default, should be silent with more noise when
+# more -v are applied
+# 4. logging handling should be improved: errors should be on stderr,
+# with logs on stdout or logfile. stderr should be copied to logfile
+# as well
+# 5. supports only LVM, assumes POSIX (so no Windows)
+# 6. see XXX below
+# 7. should have a lockfile
+# 8. should be unit tested, at this point it's grown too big
+
+import os
+import sys
+import subprocess
+import socket
+import argparse
+import re
+import stat
+import time
+import datetime
+
+class ArgumentConfigParser(argparse.ArgumentParser):
+    configs = ['/etc/bup-cron.conf', '~/.bup-cron.conf']
+    epilog = """options can also be specified, without --, in %s.
+
+at least path and repo need to be specified
+"""
+    description = 'simple wrapper around bup and LVM'
+
+    def __init__(self):
+        argparse.ArgumentParser.__init__(self,
+                                         description=self.description,
+                                         epilog=self.epilog % " or ".join(self.configs),
+                                         fromfile_prefix_chars='@')
+        self.add_argument('-v', '--verbose', action='count',
+                         help='passed to bup')
+        # using the hostname as branch name
+        self.add_argument('-n', '--name', default=socket.gethostname(),
+                            help='name of the backup passed to bup, defaults to hostname')
+        self.add_argument('-l', '--log', default=sys.stdout, type=argparse.FileType('w'),
+                            help='file where logs should be written (default to stdout)')
+        self.add_argument('--clear', action='store_true',
+                            help='redo a full backup (runs bup index --clear before starting)')
+        self.add_argument('-s', '--snapshot', nargs='?', const='lvm', choices=['lvm'],
+                            help='snapshot filesystem to make backup. this will automatically guess the path to the logical volume (if relevant) and create a snapshot, mount it, then remove it when it is done.')
+        self.add_argument('-x', '--exclude', action='append',
+                            help='exclude regex pattern, will be passed as --exclude-rx to bup')
+        if 'BUP_DIR' in os.environ:
+            defdir = os.environ['BUP_DIR']
+        else:
+            defdir = None
+        self.add_argument('-r', '--repository',
+                          required=('BUP_DIR' not in os.environ),
+                          default = defdir,
+                          help='the directory to backup to, defaults to $BUP_DIR (currently %s)' % defdir)
+        # different list because dest=paths doesn't work, it gets
+        # overwritten by the next one
+        # XXX: we'd like to not see this in the usage as well, as it's
+        # for the config file
+        self.add_argument('-p', '--path', action='append',
+                            help='add path to list of paths to backup, mostly useful for the configuration file')
+        # XXX: this should be mandatory, or at least --path or --paths should
+        self.add_argument('paths', nargs='*', help='list of paths to backup')
+
+    def convert_arg_line_to_args(self, arg_line):
+        """parse a config file that looks like this:
+"""
+        # skip whitespace and commented lines
+        if re.match('^(#|[\s]*$)', arg_line):
+            return []
+        else:
+            # all lines are assumed to be options
+            return ['--' + arg_line]
+
+    def parse_args(self):
+        configs = map(lambda x: os.path.expanduser(x), self.configs)
+        for conf in configs:
+            try:
+                with open(conf, 'r'):
+                    sys.argv.insert(1, '@' + conf)
+            except IOError:
+                pass
+            else:
+                # XXX: should use log?
+                print('using config file %s' % conf)
+        args = argparse.ArgumentParser.parse_args(self)
+        # merge the path and paths arguments
+        if args.path:
+            args.paths += args.path
+        # remove this one to avoid ambiguity
+        del args.path
+        os.environ['BUP_DIR'] = args.repository
+        # remove this one to avoid ambiguity
+        del args.repository
+        return args
+
+def log(msg):
+    """log message to stdout or logfile, depending on --log"""
+    # XXX: we should log only if verbose > 0
+    # also, errors should go on stderr no matter what, but also copied to log
+    args.log.write("%s %s\n" % (time.ctime(), msg))
+
+def bail():
+    """cleanup on exit"""
+    global start
+    clean_lv()
+    log('user %s system %s chlduser %s chldsystem %s' % os.times()[:4])
+    log('finished in %s' % str(datetime.datetime.now() - start))
+    args.log.close()
+
+def init():
+    """initialise the repo and do other housecleaning"""
+    global start
+    start = datetime.datetime.now()
+    log('backing up %s to %s' % (args.paths, os.environ['BUP_DIR']))
+    try:
+        os.chdir(os.environ['BUP_DIR'])
+    except OSError:
+        log('bup dir not found, creating')
+        check_call_log(['bup', 'init'])
+    else:
+        if args.clear:
+            check_call_log(['bup', 'index', '--clear'])
+
+def check_call_log(cmd):
+    """call a procss, log it to the logfile and return false if it fails, otherwise true"""
+    # XXX: we should silence stdout if verbose < 1
+    try:
+        log('calling `%s`' % " ".join(cmd))
+        subprocess.check_call(cmd, stdout=args.log, stderr=args.log)
+    except subprocess.CalledProcessError:
+        log('command `%s` failed' % " ".join(cmd))
+        return False
+    return True
+
+def find_device(path):
+    """find device based on mountpoint path, return the re.match (so None if not found)"""
+    mounts = subprocess.check_output(['mount'])
+    try:
+        return re.match(r".*^(/[^ ]*) on %s .*" % path, mounts, re.MULTILINE | re.DOTALL).group(1)
+    except:
+        return False
+
+def find_vg_lv(device):
+    try:
+        lvs = subprocess.check_output(['lvs', device])
+    except subprocess.CalledProcessError:
+        # not a LVM
+        return False
+    # second line of output, second and third fields, backwards
+    return re.split(r' +', re.split("\n", lvs)[1])[2:0:-1]
+
+def snapname(lv):
+    return 'snap%s' % lv
+
+# XXX: won't work across multiple VGs with conflicting LV names
+def snapmount(name):
+    return '/media/bup/%s' % name
+
+def lvdev(vg, lv):
+    return '/dev/%s/%s' % ( vg, lv )
+
+def clean_lv():
+    if args.snapshot and vg and lv:
+        m = snapmount(snapname(lv))
+        if os.path.ismount(m) and not check_call_log(['umount', m]):
+            log('failed to umount %s' % m)
+        try:
+            log('removing directory %s' % m)
+            os.removedirs(m)
+        except:
+            pass
+        device = lvdev(vg, snapname(lv))
+        try:
+            # XXX: should respect --verbose settings
+            if stat.S_ISBLK(os.stat(device).st_mode) and not check_call_log(['lvremove', '-f', device]):
+                log('failed to drop snapshot %s' % device)
+        except OSError as e:
+            # normal: the device doesn't exist, moving on
+            return
+
+# main loop, should be in a main() but we are stuck with a few globals
+#
+# those are:
+# args
+# lv
+# vg
+#
+# the latter two should probably be moved into a LVM singleton
+
+# XXX: this should be a "with", but first we need bup index to work properly before refactoring
+args = ArgumentConfigParser().parse_args()
+init()
+try:
+    for path in args.paths:
+        if args.snapshot:
+            # XXX: all of this should be moved to a Snapshot class, subclassed as LvmSnapshot
+            # it can then be instantiated depending on the value of args.snapshot
+            if os.path.ismount(path):
+                device = find_device(path)
+                if device:
+                    lvs = find_vg_lv(device)
+                if device and lvs:
+                    vg = lvs[0]
+                    lv = lvs[1]
+                    log('umounting and removing previous snapshot %s, if present (errors ignored)' % lvdev(vg, snapname(lv)))
+                    clean_lv()
+                    # XXX: snapshot size hardcoded
+                    # should respect --verbose settings
+                    if check_call_log(['lvcreate', '--size', '1GB', '--snapshot', '-n', snapname(lv), device]):
+                        try:
+                            os.chdir(snapmount(snapname(lv)))
+                        except OSError:
+                            log('creating missing mountpoint %s' % snapmount(snapname(lv)))
+                            os.makedirs(snapmount(snapname(lv)))
+                        if check_call_log(['mount', lvdev(vg, snapname(lv)), snapmount(snapname(lv))]):
+                            path = snapmount(snapname(lv))
+                        else:
+                            log('failed to mount snapshot %s on %s, skipping snapshotting' % (snapname(lv), snapmount(snapname(lv))))
+                            lv = vg = None
+                    else:
+                        log('failed to create snapshot for LV %s on VG %s, skipping snapshooting' % (lv, vg))
+                        lv = vg = None
+                else:
+                    # XXX: we could try to find the parent mountpoint...
+                    log('%s is not a LVM mountpoint, skipping snapshotting' % path)
+            else:
+                log('%s is not a mountpoint, skipping snapshotting' % path)
+
+        # XXX: this shouldn't be in the loop like this, bup index should be
+        # able to index multiple paths
+        #
+        # unfortunately, `bup index -x / /var` skips /var...
+        log('indexing %s...' % path)
+        # XXX: should be -q(uiet) unless verbose > 0 - but bup index has no -q
+        cmd = ['bup', 'index']
+        if args.verbose > 0:
+            cmd += [ '-v' ]
+        cmd += map((lambda ex: '--exclude-rx=' + ex), args.exclude)
+        # XXX: -x hardcoded? -c and -t are apparently useful in case of
+        # disaster
+        cmd += [ '-x', path ]
+        if not check_call_log(cmd):
+            log('skipping save!')
+            clean_lv()
+            continue
+        log('saving...')
+        # XXX: should be -q(uiet) unless verbose > 0
+        cmd = ['bup', 'save']
+        if args.verbose > 0:
+            cmd += [ '-v' ]
+        # XXX: this should just be args.name, but we save once per path so
+        # it's cleaner to group by path
+        cmd += [ '-c', '-t', '--strip', '-n', args.name + '-' + path, path ]
+        check_call_log(cmd)
+        clean_lv()
+except:
+    # get exception type and error, but don't generate the traceback
+    t, e = sys.exc_info()[:2]
+    log('aborting with %s exception: %s' % (t.__name__, e))
+    # wait for bup to finish
+    os.wait()
+finally:
+    bail()
+    sys.exit(0)
