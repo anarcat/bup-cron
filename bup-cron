@@ -23,7 +23,6 @@ import re
 import stat
 import time
 import datetime
-import signal
 
 class ArgumentConfigParser(argparse.ArgumentParser):
     configs = ['/etc/bup-cron.conf', '~/.bup-cron.conf']
@@ -124,12 +123,6 @@ def bail():
 def init():
     """initialise the repo and do other housecleaning"""
     global start
-
-    signal.signal(signal.SIGTERM, signal.SIG_DFL)
-    signal.signal(signal.SIGINT, signal.SIG_DFL)
-    signal.signal(signal.SIGTSTP, signal.SIG_DFL)
-    signal.signal(signal.SIGCONT, signal.SIG_DFL)
-
     start = datetime.datetime.now()
     log('backing up %s to %s' % (args.paths, os.environ['BUP_DIR']))
     try:
