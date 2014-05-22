@@ -142,7 +142,7 @@ def check_call_log(cmd):
             stdout = args.log
         else:
             stdout = file(os.devnull)
-        subprocess.check_call(cmd, stdout=stdout, stderr=args.log)
+        subprocess.check_call(cmd, stdout=stdout, stderr=args.log, close_fds=True)
     except subprocess.CalledProcessError:
         log('command failed')
         return False
@@ -158,7 +158,7 @@ def find_device(path):
 
 def find_vg_lv(device):
     try:
-        lvs = subprocess.check_output(['lvs', device])
+        lvs = subprocess.check_output(['lvs', device], close_fds=True)
     except subprocess.CalledProcessError:
         # not a LVM
         return False
