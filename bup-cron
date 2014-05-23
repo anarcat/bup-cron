@@ -212,8 +212,8 @@ def clean_lv():
             # normal: the device doesn't exist, moving on
             return
 
-def main():
-    global vg, lv, args
+def process(args):
+    global vg, lv
     for path in args.paths:
         if args.snapshot:
             vg = lv = None
@@ -287,7 +287,7 @@ def main():
 args = ArgumentConfigParser().parse_args()
 init()
 try:
-    main()
+    process(args)
 except:
     # get exception type and error, but don't generate the traceback
     t, e = sys.exc_info()[:2]
