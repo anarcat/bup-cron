@@ -192,9 +192,6 @@ otherwise"""
         self.cleanup()
         return t is None
 
-    def __del__(self):
-        self.cleanup()
-
     def cleanup(self):
         """this function should undo all that __enter__() did"""
         pass
