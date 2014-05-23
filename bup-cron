@@ -121,11 +121,9 @@ class ArgumentConfigParser(argparse.ArgumentParser):
 def logfmt(msg):
     return "%s %s\n" % (time.ctime(), msg)
 
-def log(msg):
+def log(msg, level=1):
     """log message to stdout or logfile, depending on --log"""
-    # XXX: we should log only if verbose > 0
-    # also, errors should go on stderr no matter what, but also copied to log
-    if args.verbose > 0:
+    if args.verbose >= level:
         args.log.write(logfmt(msg))
 
 def warn(msg):
