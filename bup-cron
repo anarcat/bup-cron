@@ -2,8 +2,6 @@
 
 # limitations
 # * should do fsck and maybe compare-tree
-# * some hardcoded stuff (-x, lvm snapshot size, snapshot
-# mountpoint...)
 # * -c and -t are useless unless really verbose (-vv)
 # * supports only LVM, assumes POSIX (so no Windows)
 # * should be unit tested, at this point it's grown too big
@@ -83,6 +81,8 @@ execution, defaults to $BUP_DIR/%s"""
                           help="""snapshot filesystem before backup.
 this will automatically guess the path to the logical volume,
 create a snapshot, mount it, then remove it when it is done.""")
+        self.add_argument('-z', '--size', action='store', default=Snapshot.size,
+                          help="""size of the LVM snapshot, defaults to %(default)s""")
         self.add_argument('-x', '--exclude', action='append',
                           help="""exclude regex pattern,
 will be passed as --exclude-rx to bup""")
@@ -201,6 +201,9 @@ return false if it fails, otherwise true"""
 
 
 class Snapshot():
+    # default snapshot size
+    size = '1GB'
+
     def __init__(self, path, log=sys.stdout.write, warn=sys.stderr.write,
                  verbose=0, call=subprocess.check_call):
         """initialise the snapshot array
@@ -226,6 +229,11 @@ false otherwise"""
 class LvmSnapshot(Snapshot):
     pattern = 'snap%s%s'
 
+    def __init__(self, path, size, log=sys.stdout.write, warn=sys.stderr.write,
+                 verbose=0, call=subprocess.check_call):
+        self.size = size
+        return Snapshot.__init__(self, path, log, warn, verbose, call)
+
     def __enter__(self):
         self.vg_lv = None
         if os.path.ismount(self.path):
@@ -235,8 +243,7 @@ class LvmSnapshot(Snapshot):
                 self.vg_lv = self.find_vg_lv(device)
             if device and self.vg_lv:
                 self.cleanup()
-                # XXX: snapshot size hardcoded
-                cmd = ['lvcreate', '--size', '1GB', '--snapshot',
+                cmd = ['lvcreate', '--size', self.size, '--snapshot',
                        '-n', self.snapname(), device]
                 if self.verbose < 1:
                     cmd += ['-q']
@@ -350,7 +357,7 @@ class LvmSnapshot(Snapshot):
 def process(args):
     # current lvm object to cleanup in exception handlers
     for path in args.paths:
-        with LvmSnapshot(path, log, warn, args.verbose, check_call_log) as l:
+        with LvmSnapshot(path, args.size, log, warn, args.verbose, check_call_log) as l:
             path = l.path
             # XXX: this shouldn't be in the loop like this, bup index should be
             # able to index multiple paths
