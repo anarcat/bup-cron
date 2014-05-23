@@ -203,12 +203,14 @@ return false if it fails, otherwise true"""
 
 
 class Snapshot():
-    def __init__(self, path, log=sys.stdout.write, warn=sys.stderr.write, verbose=0, call=subprocess.check_call):
+    def __init__(self, path, log=sys.stdout.write, warn=sys.stderr.write,
+                 verbose=0, call=subprocess.check_call):
         """initialise the snapshot array
 
 path is expected to be the root of the filesystem
 log and warn are logging utilities
-call is a way to call processes that will return true on success or false otherwise"""
+call is a way to call processes that will return true on success or
+false otherwise"""
         self.path = path
         self.log = log
         self.warn = warn
@@ -221,6 +223,7 @@ call is a way to call processes that will return true on success or false otherw
     def __exit__(self, t, e, tb):
         # return false to raise, true to pass
         pass
+
 
 class LvmSnapshot(Snapshot):
     def __enter__(self):
@@ -247,18 +250,19 @@ class LvmSnapshot(Snapshot):
                         os.chdir(self.snapmount(self.snapname(lv)))
                     except OSError:
                         self.log('creating missing mountpoint %s'
-                            % self.snapmount(self.snapname(lv)))
+                                 % self.snapmount(self.snapname(lv)))
                         os.makedirs(self.snapmount(self.snapname(lv)))
                     if self.call(['mount', self.lvdev(vg, self.snapname(lv)),
-                                       self.snapmount(self.snapname(lv))]):
+                                  self.snapmount(self.snapname(lv))]):
                         self.path = self.snapmount(self.snapname(lv))
                     else:
                         self.warn('failed to mount snapshot %s on %s, skipping snapshotting'
-                             % (self.snapname(lv), self.snapmount(self.snapname(lv))))
+                                  % (self.snapname(lv),
+                                     self.snapmount(self.snapname(lv))))
                         lv = vg = None
                 else:
                     self.warn('failed to create snapshot for LV %s on VG %s, skipping snapshooting'
-                         % (lv, vg))
+                              % (lv, vg))
                     lv = vg = None
             else:
                 # XXX: we could try to find the parent mountpoint...
@@ -285,7 +289,6 @@ class LvmSnapshot(Snapshot):
         except:
             return False
 
-
     def find_vg_lv(self, device):
         try:
             lvs = subprocess.check_output(['lvs', device], close_fds=True)
@@ -295,19 +298,15 @@ class LvmSnapshot(Snapshot):
         # second line of output, second and third fields, backwards
         return re.split(r' +', re.split("\n", lvs)[1])[2:0:-1]
 
-
     def snapname(self, lv):
         return 'snap%s' % lv
-
 
     # XXX: won't work across multiple VGs with conflicting LV names
     def snapmount(self, name):
         return '/media/bup/%s' % name
 
-
     def lvdev(self, vg, lv):
         return '/dev/%s/%s' % (vg, lv)
-
 
     def clean_lv(self):
         if self.vg_lv is None:
@@ -343,7 +342,6 @@ class LvmSnapshot(Snapshot):
             return
 
 
-
 def process(args):
     # current lvm object to cleanup in exception handlers
     global lvm
@@ -356,7 +354,8 @@ def process(args):
             #
             # unfortunately, `bup index -x / /var` skips /var...
             log('indexing %s' % path)
-            # XXX: should be -q(uiet) unless verbose > 0 - but bup index has no -q
+            # XXX: should be -q(uiet) unless verbose > 0 - but bup
+            # index has no -q
             cmd = ['bup', 'index']
             if args.verbose > 1:
                 cmd += ['-v']
