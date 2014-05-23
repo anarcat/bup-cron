@@ -373,11 +373,14 @@ def main():
         with Pidfile(args.pidfile, log, warn):
             process(args)
     except:
+        #t, e, b = sys.exc_info()
+        #warn(traceback.print_tb(b))
         # get exception type and error, but don't generate the traceback
         t, e = sys.exc_info()[:2]
         warn('aborting with %s exception: %s' % (t.__name__, e))
         # wait for bup to finish
         os.wait()
+        bail(1)
     finally:
         bail(0)
 
