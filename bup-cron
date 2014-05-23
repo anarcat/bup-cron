@@ -1,11 +1,13 @@
 #! /usr/bin/python
 
 # limitations
-# * should do fsck and maybe compare-tree
 # * -c and -t are useless unless really verbose (-vv)
 # * supports only LVM, assumes POSIX (so no Windows)
 # * should be unit tested, at this point it's grown too big
 # * see XXX below for more
+
+# features to add
+# * --test to run compare-tree after backup
 
 import os
 import sys
@@ -85,6 +87,9 @@ create a snapshot, mount it, then remove it when it is done.""")
         self.add_argument('-x', '--exclude', action='append',
                           help="""exclude regex pattern,
 will be passed as --exclude-rx to bup""")
+        self.add_argument('--parity', action='store_true',
+                          help="""generate recovery blocks after backup.
+runs bup fsck -g after the backup, requires par2(1).""")
         if 'BUP_DIR' in os.environ:
             defdir = os.environ['BUP_DIR']
         else:
@@ -386,6 +391,15 @@ def process(args):
             #  -c and -t are apparently useful in case of disaster
             cmd += ['--commit', '--tree', '--strip', '--name', args.name + '-' + path, path]
             check_call_log(cmd)
+            if args.parity:
+                if check_call_log(['bup', 'fsck', '--par2-ok']):
+                    cmd = ['bup', 'fsck', '--generate']
+                    if args.verbose > 1:
+                        cmd += ['--verbose']
+                    log('generating par2(1) recovery blocks')
+                    check_call_log(cmd)
+                else:
+                    warn('bup reports par2(1) as not working, no recovery blocks written')
 
 
 class Pidfile():
