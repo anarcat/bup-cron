@@ -366,7 +366,7 @@ it will also cleanup after itself"""
             return False
 
     def create(self):
-        """initialise pid file"""        
+        """initialise pid file"""
         try:
             self.pidfd = os.open(self.pidfile,
                                  os.O_CREAT | os.O_WRONLY | os.O_EXCL)
