@@ -162,8 +162,11 @@ class Snapshot():
     # default snapshot size
     size = '1GB'
 
-    def __init__(self, path, log=sys.stdout.write, warn=sys.stderr.write,
-                 verbose=0, call=subprocess.check_call):
+    # the location the snapshot is mounted on
+    mountpattern = '/media/bup/%s-%s'
+
+    def __init__(self, path, size, log=sys.stdout.write, warn=sys.stderr.write,
+                 verbose=0, call=subprocess.check_call, mountpattern=None):
         """initialise the snapshot array
 
 path is expected to be the root of the filesystem
@@ -171,10 +174,13 @@ log and warn are logging utilities
 call is a way to call processes that will return true on success or
 false otherwise"""
         self.path = path
+        self.size = size
         self.log = log
         self.warn = warn
         self.verbose = verbose
         self.call = call
+        if mountpattern is not None:
+            self.mountpattern = mountpattern
 
     def __enter__(self):
         """this should be reimplemented by subclasses
@@ -198,14 +204,6 @@ otherwise"""
 
 
 class LvmSnapshot(Snapshot):
-    pattern = 'snap%s%s'
-
-    def __init__(self, path, size, log=sys.stdout.write, warn=sys.stderr.write,
-                 verbose=0, call=subprocess.check_call):
-        """overrides parent to set size"""
-        self.size = size
-        return Snapshot.__init__(self, path, log, warn, verbose, call)
-
     def __enter__(self):
         """set the LVM and mount it"""
         self.vg_lv = None
@@ -275,12 +273,12 @@ skipping snapshooting"""
     def snapname(self):
         """the name of the snapshot volume to be created
 
-pattern should have two string wildcards"""
-        return self.pattern % self.vg_lv
+pattern should have two string wildcards, one for vg, the other for lv"""
+        return 'snap%s' % self.vg_lv[1]
 
     def mountpoint(self):
-        """where to mount the device"""
-        return '/media/bup/%s' % self.snapname()
+        """where to mount the snapshot device"""
+        return self.mountpattern % self.vg_lv
 
     def device(self):
         """path to the device of the snapshot LV"""
