@@ -156,10 +156,7 @@ def warn(msg):
 
 def bail(status, msg=None):
     """cleanup on exit"""
-    global start, lvm
-    # cleanup global lvm
-    if lvm:
-        lvm.clean_lv()
+    global start
     if msg:
         warn(msg)
     utimes = 'user %s system %s chlduser %s chldsystem %s' % os.times()[:4]
@@ -277,6 +274,9 @@ class LvmSnapshot(Snapshot):
         self.clean_lv()
         return t is None
 
+    def __del__(self):
+        self.clean_lv()
+
     def find_device(self, path):
         """find device based on mountpoint path
 
@@ -352,10 +352,8 @@ class LvmSnapshot(Snapshot):
 
 def process(args):
     # current lvm object to cleanup in exception handlers
-    global lvm
     for path in args.paths:
         with LvmSnapshot(path, log, warn, args.verbose, check_call_log) as l:
-            lvm = l
             path = l.path
             # XXX: this shouldn't be in the loop like this, bup index should be
             # able to index multiple paths
@@ -384,7 +382,6 @@ def process(args):
             #  -c and -t are apparently useful in case of disaster
             cmd += ['-c', '-t', '--strip', '-n', args.name + '-' + path, path]
             check_call_log(cmd)
-    lvm = None
 
 
 class Pidfile():
@@ -466,8 +463,6 @@ class ProcessRunningException(BaseException):
 
 def main():
     global args, pidfd
-    # XXX: this should be a "with", but first we need bup index to
-    # work properly before refactoring
     args = ArgumentConfigParser().parse_args()
     init()
     try:
