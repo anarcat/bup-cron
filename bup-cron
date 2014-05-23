@@ -45,9 +45,11 @@ class SaferFileType(argparse.FileType):
 
 class ArgumentConfigParser(argparse.ArgumentParser):
     configs = ['/etc/bup-cron.conf', '~/.bup-cron.conf']
-    epilog = """options can also be specified, without --, in %s.
+    epilog = """options can also be specified, without --, in %s. an
+    arbitrary configuration file may also be supplied on the
+    commandline with a @ prefix (e.g. @foo.conf).
 
-at least path and repo need to be specified
+    at least path and repo need to be specified.
 """
     description = 'simple wrapper around bup and LVM'
 
