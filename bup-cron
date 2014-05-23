@@ -455,7 +455,6 @@ def bail(status, msg=None):
     utimes = 'user %s system %s chlduser %s chldsystem %s' % os.times()[:4]
     log('finished in %s (%s)'
         % (str(datetime.datetime.now() - __START), utimes))
-    __ARGS.log.close()
     sys.exit(status)
 
 
