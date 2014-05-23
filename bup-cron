@@ -74,6 +74,12 @@ create a snapshot, mount it, then remove it when it is done.""")
                           default=Snapshot.size,
                           help="""size of the LVM snapshot,
 defaults to %(default)s""")
+        self.add_argument('-m', '--mountpoint', action='store',
+                          default=Snapshot.mountpattern,
+                          help="""mountpoint of the snapshot device.
+                                  should contain two %%s patterns, for
+                                  the VG and LV names, default:
+                                  %(default)s)""")
         self.add_argument('--clear', action='store_true',
                           help="""redo a full backup
 (runs bup index --clear before starting)""")
@@ -498,7 +504,9 @@ def process(args):
     for path in args.paths:
         with LvmSnapshot(path, args.size,
                          log, warn,
-                         args.verbose, check_call_log) as l:
+                         args.verbose,
+                         check_call_log,
+                         args.mountpoint) as l:
             path = l.path
             # XXX: this shouldn't be in the loop like this, bup index should be
             # able to index multiple paths
