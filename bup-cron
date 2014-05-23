@@ -136,15 +136,15 @@ def bail():
     """cleanup on exit"""
     global start
     clean_lv()
-    log('user %s system %s chlduser %s chldsystem %s' % os.times()[:4])
-    log('finished in %s' % str(datetime.datetime.now() - start))
+    utimes = 'user %s system %s chlduser %s chldsystem %s' % os.times()[:4]
+    log('finished in %s (%s)' % (str(datetime.datetime.now() - start), utimes))
     args.log.close()
 
 def init():
     """initialise the repo and do other housecleaning"""
     global start
     start = datetime.datetime.now()
-    log('backing up %s to %s' % (args.paths, os.environ['BUP_DIR']))
+    log('backing up %s to %s' % (" ".join(args.paths), os.environ['BUP_DIR']))
     try:
         os.chdir(os.environ['BUP_DIR'])
     except OSError:
@@ -152,6 +152,7 @@ def init():
         check_call_log(['bup', 'init'])
     else:
         if args.clear:
+            log('clearing log')
             check_call_log(['bup', 'index', '--clear'])
 
 def check_call_log(cmd):
