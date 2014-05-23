@@ -433,8 +433,8 @@ class ProcessRunningException(Exception):
         """override parent constructor to keep path and pid"""
         self.path = path
         self.pid = pid
-        return Exception.__init(self, 'process already running in % as pid %s'
-                                % (path, pid))
+        return Exception.__init__(self, 'process already running in %s as pid %s'
+                                  % (path, pid))
 
 
 def logfmt(msg):
