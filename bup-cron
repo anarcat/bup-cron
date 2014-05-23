@@ -4,7 +4,6 @@
 # * should do fsck and maybe compare-tree
 # * some hardcoded stuff (-x, lvm snapshot size, snapshot
 # mountpoint...)
-# * should have a lockfile
 # * supports only LVM, assumes POSIX (so no Windows)
 # * should be unit tested, at this point it's grown too big
 # * see XXX below for more
@@ -18,6 +17,7 @@ import re
 import stat
 import time
 import datetime
+import errno
 
 class SaferFileType(argparse.FileType):
     """Factory for creating file object types
@@ -45,6 +45,7 @@ class ArgumentConfigParser(argparse.ArgumentParser):
     at least path and repo need to be specified.
 """
     description = 'simple wrapper around bup and LVM'
+    pidfile = '.bup-cron.pid'
 
     def __init__(self):
         argparse.ArgumentParser.__init__(self,
@@ -59,6 +60,8 @@ class ArgumentConfigParser(argparse.ArgumentParser):
         self.add_argument('-l', '--logfile', default=sys.stdout, dest='log',
                           type=SaferFileType(mode='a', bufsize=1),
                             help='file where logs should be written, defaults to stdout')
+        self.add_argument('--pidfile', default=None, action='store',
+                          help='lockfile to write to avoid simultanous execution, defaults to $BUP_DIR/%s' % self.pidfile)
         self.add_argument('--clear', action='store_true',
                             help='redo a full backup (runs bup index --clear before starting)')
         self.add_argument('-s', '--snapshot', nargs='?', const='lvm', choices=['lvm'],
@@ -109,6 +112,8 @@ class ArgumentConfigParser(argparse.ArgumentParser):
         os.environ['BUP_DIR'] = args.repository
         # remove this one to avoid ambiguity
         del args.repository
+        if args.pidfile is None:
+            args.pidfile = os.path.join(os.environ['BUP_DIR'], self.pidfile)
         return args
 
 def logfmt(msg):
@@ -125,13 +130,20 @@ def warn(msg):
         log(msg, 0)
     sys.stderr.write(logfmt(msg))
 
-def bail():
+def bail(status,msg=None):
     """cleanup on exit"""
-    global start
+    global start, pidfd
     clean_lv()
+    if msg:
+        warn(msg)
     utimes = 'user %s system %s chlduser %s chldsystem %s' % os.times()[:4]
     log('finished in %s (%s)' % (str(datetime.datetime.now() - start), utimes))
     args.log.close()
+    if pidfd:
+        pidfd = None
+        os.remove(args.pidfile)
+    sys.exit(status)
+
 
 def init():
     """initialise the repo and do other housecleaning"""
@@ -283,13 +295,59 @@ def process(args):
         check_call_log(cmd)
         clean_lv()
 
+def check_pidfile(pidfile):
+    """check if a process is still running
+
+the process id is expected to be in pidfile, which should exist.
+
+if it is still running, returns the pid, if not, remove the pidfile and
+returns False."""
+
+    with open(pidfile, 'r') as f:
+        try:
+            pid = f.read()
+            print "pid: %s" % pid
+            pid = int(pid)
+        except ValueError:
+            # not an integer
+            print "not an integer: " + pid
+            os.remove(pidfile)
+            return False
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            print "can't deliver signal to " + pid
+            os.remove(pidfile)
+            return False
+        else:
+            return pid
+
 def main():
-    global args
+    global args, pidfd
     # XXX: this should be a "with", but first we need bup index to work properly before refactoring
     args = ArgumentConfigParser().parse_args()
     init()
+    # XXX: this should be moved to a pidfile class
     try:
+        pidfd = os.open(args.pidfile, os.O_CREAT|os.O_WRONLY|os.O_EXCL)
+        log('locked pidfile %s: %s' % (args.pidfile, pidfd))
+    except OSError as e:
+        if e.errno == errno.EEXIST:
+            pid = check_pidfile(args.pidfile)
+            if pid:
+                pidfd = None
+                bail(1, 'bup-cron already running in %s as pid %s, aborting' % (os.environ['BUP_DIR'], pid));
+            else:
+                warn('removed staled lockfile %s' % (args.pidfile))
+                pidfd = os.open(args.pidfile, os.O_CREAT|os.O_WRONLY|os.O_EXCL)
+        else:
+            raise
+    try:
+        os.write(pidfd, str(os.getpid()))
+        os.close(pidfd)
         process(args)
+        pidfd = None
+        os.remove(args.pidfile)
     except:
         # get exception type and error, but don't generate the traceback
         t, e = sys.exc_info()[:2]
@@ -297,8 +355,7 @@ def main():
         # wait for bup to finish
         os.wait()
     finally:
-        bail()
-        sys.exit(0)
+        bail(0)
 
 if __name__ == '__main__':
     main()
