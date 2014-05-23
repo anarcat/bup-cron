@@ -347,8 +347,7 @@ it will also cleanup after itself"""
                 pid = self._check()
                 if pid:
                     self.pidfd = None
-                    raise ProcessRunningException('process already running in %s as pid %s'
-                                                  % (self.pidfile, pid))
+                    raise ProcessRunningException(self.pidfile, pid)
                 else:
                     os.remove(self.pidfile)
                     self.warn('removed staled lockfile %s' % (self.pidfile))
@@ -406,8 +405,16 @@ if it is still running, returns the pid, if not, return False."""
                 return pid
 
 
-class ProcessRunningException(BaseException):
-    pass
+class ProcessRunningException(Exception):
+    """an exception yielded by the Pidfile class when a process is
+    detected using the pid file"""
+
+    def __init__(self, path, pid):
+        """override parent constructor to keep path and pid"""
+        self.path = path
+        self.pid = pid
+        return Exception.__init(self, 'process already running in % as pid %s'
+                                % (path, pid))
 
 
 def logfmt(msg):
