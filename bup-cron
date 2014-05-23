@@ -167,8 +167,15 @@ false otherwise"""
 
     def __exit__(self, t, e, tb):
         # return false to raise, true to pass
-        pass
+        self.cleanup()
+        return t is None
 
+    def __del__(self):
+        self.cleanup()
+
+    def cleanup(self):
+        """this function should undo all that __enter__() did"""
+        pass
 
 class LvmSnapshot(Snapshot):
     pattern = 'snap%s%s'
@@ -219,14 +226,6 @@ skipping snapshooting"""
         else:
             warn('%s is not a mountpoint, skipping snapshotting' % self.path)
         return self
-
-    def __exit__(self, t, e, tb):
-        # return false to raise, true to pass
-        self.cleanup()
-        return t is None
-
-    def __del__(self):
-        self.cleanup()
 
     def find_device(self):
         """find device based on mountpoint path
