@@ -184,7 +184,7 @@ class LvmSnapshot(Snapshot):
             device = self.find_device()
             if device:
                 # vg, lv
-                self.vg_lv = self.find_vg_lv(device)
+                self.vg_lv = LvmSnapshot.find_vg_lv(device)
             if device and self.vg_lv:
                 self.cleanup()
                 cmd = ['lvcreate', '--size', self.size, '--snapshot',
@@ -240,7 +240,9 @@ skipping snapshooting"""
         except:
             return False
 
-    def find_vg_lv(self, device):
+    @classmethod
+    def find_vg_lv(device):
+        """find the volume group and logical volume of the specified device"""
         try:
             lvs = subprocess.check_output(['lvs', device], close_fds=True)
         except subprocess.CalledProcessError:
