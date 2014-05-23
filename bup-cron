@@ -144,68 +144,6 @@ mostly useful for the configuration file""")
         return args
 
 
-def logfmt(msg):
-    return "%s %s\n" % (time.ctime(), msg)
-
-
-def log(msg, level=1):
-    """log message to stdout or logfile, depending on --log"""
-    if args.verbose >= level:
-        args.log.write(logfmt(msg))
-
-
-def warn(msg):
-    # if log is a file, copy there
-    if not args.log.isatty():
-        log(msg, 0)
-    sys.stderr.write(logfmt(msg))
-
-
-def bail(status, msg=None):
-    """cleanup on exit"""
-    global start
-    if msg:
-        warn(msg)
-    utimes = 'user %s system %s chlduser %s chldsystem %s' % os.times()[:4]
-    log('finished in %s (%s)' % (str(datetime.datetime.now() - start), utimes))
-    args.log.close()
-    sys.exit(status)
-
-
-def init():
-    """initialise the repo and do other housecleaning"""
-    global start
-    start = datetime.datetime.now()
-    log('backing up %s to %s' % (" ".join(args.paths), os.environ['BUP_DIR']))
-    try:
-        os.chdir(os.environ['BUP_DIR'])
-    except OSError:
-        log('bup dir not found, creating')
-        check_call_log(['bup', 'init'])
-    else:
-        if args.clear:
-            log('clearing log')
-            check_call_log(['bup', 'index', '--clear'])
-
-
-def check_call_log(cmd):
-    """call a procss, log it to the logfile
-
-return false if it fails, otherwise true"""
-    try:
-        log('calling command `%s`' % " ".join(cmd), 2)
-        if args.verbose > 1:
-            stdout = args.log
-        else:
-            stdout = file(os.devnull)
-        subprocess.check_call(cmd, stdout=stdout, stderr=args.log,
-                              close_fds=True)
-    except subprocess.CalledProcessError:
-        warn('command failed')
-        return False
-    return True
-
-
 class Snapshot():
     # default snapshot size
     size = '1GB'
@@ -360,53 +298,6 @@ skipping snapshooting"""
             return
 
 
-def process(args):
-    # current lvm object to cleanup in exception handlers
-    for path in args.paths:
-        with LvmSnapshot(path, args.size,
-                         log, warn,
-                         args.verbose, check_call_log) as l:
-            path = l.path
-            # XXX: this shouldn't be in the loop like this, bup index should be
-            # able to index multiple paths
-            #
-            # unfortunately, `bup index -x / /var` skips /var...
-            log('indexing %s' % path)
-            # XXX: should be -q(uiet) unless verbose > 0 - but bup
-            # index has no -q
-            cmd = ['bup', 'index']
-            if args.verbose > 1:
-                cmd += ['--verbose']
-            if args.exclude:
-                cmd += map((lambda ex: '--exclude-rx=' + ex), args.exclude)
-            cmd += ['--one-file-system', path]
-            if not check_call_log(cmd):
-                warn('skipping save because index failed!')
-                continue
-            log('saving %s' % path)
-            cmd = ['bup', 'save']
-            if args.verbose < 1:
-                cmd += ['--quiet']
-            if args.verbose > 1:
-                cmd += ['--verbose']
-            # XXX: this should just be args.name, but we save once per path so
-            # it's cleaner to group by path
-            #  -c and -t are apparently useful in case of disaster
-            cmd += ['--commit', '--tree', '--strip',
-                    '--name', args.name + '-' + path, path]
-            check_call_log(cmd)
-            if args.parity:
-                if check_call_log(['bup', 'fsck', '--par2-ok']):
-                    cmd = ['bup', 'fsck', '--generate']
-                    if args.verbose > 1:
-                        cmd += ['--verbose']
-                    log('generating par2(1) recovery blocks')
-                    check_call_log(cmd)
-                else:
-                    warn("""bup reports par2(1) as not working,
-no recovery blocks written""")
-
-
 class Pidfile():
     def __init__(self, path, log=sys.stdout.write, warn=sys.stderr.write):
         self.pidfile = path
@@ -482,6 +373,115 @@ if it is still running, returns the pid, if not, return False."""
 
 class ProcessRunningException(BaseException):
     pass
+
+
+def logfmt(msg):
+    return "%s %s\n" % (time.ctime(), msg)
+
+
+def log(msg, level=1):
+    """log message to stdout or logfile, depending on --log"""
+    if args.verbose >= level:
+        args.log.write(logfmt(msg))
+
+
+def warn(msg):
+    # if log is a file, copy there
+    if not args.log.isatty():
+        log(msg, 0)
+    sys.stderr.write(logfmt(msg))
+
+
+def bail(status, msg=None):
+    """cleanup on exit"""
+    global start
+    if msg:
+        warn(msg)
+    utimes = 'user %s system %s chlduser %s chldsystem %s' % os.times()[:4]
+    log('finished in %s (%s)' % (str(datetime.datetime.now() - start), utimes))
+    args.log.close()
+    sys.exit(status)
+
+
+def init():
+    """initialise the repo and do other housecleaning"""
+    global start
+    start = datetime.datetime.now()
+    log('backing up %s to %s' % (" ".join(args.paths), os.environ['BUP_DIR']))
+    try:
+        os.chdir(os.environ['BUP_DIR'])
+    except OSError:
+        log('bup dir not found, creating')
+        check_call_log(['bup', 'init'])
+    else:
+        if args.clear:
+            log('clearing log')
+            check_call_log(['bup', 'index', '--clear'])
+
+
+def check_call_log(cmd):
+    """call a procss, log it to the logfile
+
+return false if it fails, otherwise true"""
+    try:
+        log('calling command `%s`' % " ".join(cmd), 2)
+        if args.verbose > 1:
+            stdout = args.log
+        else:
+            stdout = file(os.devnull)
+        subprocess.check_call(cmd, stdout=stdout, stderr=args.log,
+                              close_fds=True)
+    except subprocess.CalledProcessError:
+        warn('command failed')
+        return False
+    return True
+
+
+def process(args):
+    # current lvm object to cleanup in exception handlers
+    for path in args.paths:
+        with LvmSnapshot(path, args.size,
+                         log, warn,
+                         args.verbose, check_call_log) as l:
+            path = l.path
+            # XXX: this shouldn't be in the loop like this, bup index should be
+            # able to index multiple paths
+            #
+            # unfortunately, `bup index -x / /var` skips /var...
+            log('indexing %s' % path)
+            # XXX: should be -q(uiet) unless verbose > 0 - but bup
+            # index has no -q
+            cmd = ['bup', 'index']
+            if args.verbose > 1:
+                cmd += ['--verbose']
+            if args.exclude:
+                cmd += map((lambda ex: '--exclude-rx=' + ex), args.exclude)
+            cmd += ['--one-file-system', path]
+            if not check_call_log(cmd):
+                warn('skipping save because index failed!')
+                continue
+            log('saving %s' % path)
+            cmd = ['bup', 'save']
+            if args.verbose < 1:
+                cmd += ['--quiet']
+            if args.verbose > 1:
+                cmd += ['--verbose']
+            # XXX: this should just be args.name, but we save once per path so
+            # it's cleaner to group by path
+            #  -c and -t are apparently useful in case of disaster
+            cmd += ['--commit', '--tree', '--strip',
+                    '--name', args.name + '-' + path, path]
+            check_call_log(cmd)
+            if args.parity:
+                if check_call_log(['bup', 'fsck', '--par2-ok']):
+                    cmd = ['bup', 'fsck', '--generate']
+                    if args.verbose > 1:
+                        cmd += ['--verbose']
+                    log('generating par2(1) recovery blocks')
+                    check_call_log(cmd)
+                else:
+                    warn("""bup reports par2(1) as not working,
+no recovery blocks written""")
 
 
 def main():
