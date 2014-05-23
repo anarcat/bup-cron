@@ -376,7 +376,7 @@ def process(args):
             #  -c and -t are apparently useful in case of disaster
             cmd += ['-c', '-t', '--strip', '-n', args.name + '-' + path, path]
             check_call_log(cmd)
-            lvm = None
+    lvm = None
 
 
 class Pidfile():
