@@ -243,11 +243,11 @@ class LvmSnapshot(Snapshot):
             if device and self.vg_lv:
                 self.cleanup()
                 cmd = ['lvcreate', '--size', self.size, '--snapshot',
-                       '-n', self.snapname(), device]
+                       '--name', self.snapname(), device]
                 if self.verbose < 1:
-                    cmd += ['-q']
+                    cmd += ['--quiet']
                 if self.verbose > 1:
-                    cmd += ['-v']
+                    cmd += ['--verbose']
                 if self.call(cmd):
                     try:
                         os.chdir(self.mountpoint())
@@ -338,11 +338,12 @@ class LvmSnapshot(Snapshot):
             pass
         device = self.device()
         try:
-            cmd = ['lvremove', '-f', device]
+            # --force is required to avoid confirmation
+            cmd = ['lvremove', '--force', device]
             if args.verbose < 1:
-                cmd += ['-q']
+                cmd += ['--quiet']
             if args.verbose > 1:
-                cmd += ['-v']
+                cmd += ['--verbose']
             if stat.S_ISBLK(os.stat(device).st_mode):
                 if self.call(cmd):
                     self.log('dropped snapshot %s' % device)
@@ -367,24 +368,23 @@ def process(args):
             # index has no -q
             cmd = ['bup', 'index']
             if args.verbose > 1:
-                cmd += ['-v']
+                cmd += ['--verbose']
             if args.exclude:
                 cmd += map((lambda ex: '--exclude-rx=' + ex), args.exclude)
-            # XXX: -x hardcoded?
-            cmd += ['-x', path]
+            cmd += ['--one-file-system', path]
             if not check_call_log(cmd):
                 warn('skipping save because index failed!')
                 continue
             log('saving %s' % path)
             cmd = ['bup', 'save']
             if args.verbose < 1:
-                cmd += ['-q']
+                cmd += ['--quiet']
             if args.verbose > 1:
-                cmd += ['-v']
+                cmd += ['--verbose']
             # XXX: this should just be args.name, but we save once per path so
             # it's cleaner to group by path
             #  -c and -t are apparently useful in case of disaster
-            cmd += ['-c', '-t', '--strip', '-n', args.name + '-' + path, path]
+            cmd += ['--commit', '--tree', '--strip', '--name', args.name + '-' + path, path]
             check_call_log(cmd)
 
 
