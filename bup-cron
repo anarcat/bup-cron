@@ -27,6 +27,7 @@ import stat
 import time
 import datetime
 import errno
+import traceback
 
 
 class ArgumentConfigParser(argparse.ArgumentParser):
@@ -53,6 +54,9 @@ tries to be silent if not specified.
 -v implies explaining what we do,
 -vv shows output of commands,
 -vvv passes verbose to those commands""")
+        self.add_argument('-d', '--debug', action='store_true',
+                          help="""print debug backtrace on unhandled exceptions
+                                  - by default only the message is printed""")
         # using the hostname as branch name
         self.add_argument('-n', '--name', default=socket.gethostname(),
                           help="""name of the backup passed to bup,
@@ -567,11 +571,14 @@ def main():
         with Pidfile(__ARGS.pidfile, log, warn):
             process(__ARGS)
     except:
-        #t, e, b = sys.exc_info()
-        #warn(traceback.print_tb(b))
         # get exception type and error, but don't generate the traceback
-        t, e = sys.exc_info()[:2]
+        if __ARGS.debug:
+            t, e, b = sys.exc_info()
+        else:
+            t, e = sys.exc_info()[:2]
         warn('aborting with %s exception: %s' % (t.__name__, e))
+        if __ARGS.debug:
+                warn(traceback.print_tb(b))
         bail(1)
     bail(0)
 
