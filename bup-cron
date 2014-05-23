@@ -234,8 +234,6 @@ class LvmSnapshot(Snapshot):
                 # shortcuts
                 vg = self.vg_lv[0]
                 lv = self.vg_lv[1]
-                self.log('umounting and removing previous snapshot %s, if present (errors ignored)'
-                    % self.lvdev(vg, self.snapname(lv)))
                 self.clean_lv()
                 # XXX: snapshot size hardcoded
                 cmd = ['lvcreate', '--size', '1GB', '--snapshot',
@@ -318,11 +316,14 @@ class LvmSnapshot(Snapshot):
         vg = self.vg_lv[0]
         lv = self.vg_lv[1]
         m = self.snapmount(self.snapname(lv))
-        if os.path.ismount(m) and not self.call(['umount', m]):
-            self.warn('failed to umount %s' % m)
+        if os.path.ismount(m):
+            if self.call(['umount', m]):
+                self.log('umounted %s' % m)
+            else:
+                self.warn('failed to umount %s' % m)
         try:
-            self.log('removing directory %s' % m)
             os.removedirs(m)
+            self.log('removed directory %s' % m)
         except:
             pass
         device = self.lvdev(vg, self.snapname(lv))
@@ -332,9 +333,11 @@ class LvmSnapshot(Snapshot):
                 cmd += ['-q']
             if args.verbose > 1:
                 cmd += ['-v']
-            if stat.S_ISBLK(os.stat(device).st_mode) and \
-                    not self.call(cmd):
-                self.warn('failed to drop snapshot %s' % device)
+            if stat.S_ISBLK(os.stat(device).st_mode):
+                if self.call(cmd):
+                    self.log('dropped snapshot %s' % device)
+                else:
+                    self.warn('failed to drop snapshot %s' % device)
         except OSError:
             # normal: the device doesn't exist, moving on
             return
