@@ -26,6 +26,23 @@ import stat
 import time
 import datetime
 
+class SaferFileType(argparse.FileType):
+    """Factory for creating file object types
+
+    This replacement is necessary for two reasons:
+
+    * '-' and mode='a' conflict
+    * crashes if logfile cannot be opened, which breaks usage
+    """
+    def __call__(self, string):
+        if string == '-' and 'a' in self._mode:
+            self._mode = self._mode.replace('a', 'w')
+        try:
+            return argparse.FileType.__call__(self, string)
+        except argparse.ArgumentTypeError as e:
+            sys.stderr.write(str(e) + "\n")
+            return sys.stdout
+
 class ArgumentConfigParser(argparse.ArgumentParser):
     configs = ['/etc/bup-cron.conf', '~/.bup-cron.conf']
     epilog = """options can also be specified, without --, in %s.
@@ -44,8 +61,8 @@ at least path and repo need to be specified
         # using the hostname as branch name
         self.add_argument('-n', '--name', default=socket.gethostname(),
                             help='name of the backup passed to bup, defaults to hostname (%s)' % socket.gethostname())
-        self.add_argument('-l', '--log', default=sys.stdout,
-                          type=argparse.FileType(mode='a', bufsize=1),
+        self.add_argument('-l', '--logfile', default=sys.stdout, dest='log',
+                          type=SaferFileType(mode='a', bufsize=1),
                             help='file where logs should be written, defaults to stdout')
         self.add_argument('--clear', action='store_true',
                             help='redo a full backup (runs bup index --clear before starting)')
