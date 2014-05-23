@@ -79,8 +79,10 @@ execution, defaults to $BUP_DIR/%s"""
                           help="""snapshot filesystem before backup.
 this will automatically guess the path to the logical volume,
 create a snapshot, mount it, then remove it when it is done.""")
-        self.add_argument('-z', '--size', action='store', default=Snapshot.size,
-                          help="""size of the LVM snapshot, defaults to %(default)s""")
+        self.add_argument('-z', '--size', action='store',
+                          default=Snapshot.size,
+                          help="""size of the LVM snapshot,
+defaults to %(default)s""")
         self.add_argument('--clear', action='store_true',
                           help="""redo a full backup
 (runs bup index --clear before starting)""")
@@ -264,11 +266,13 @@ class LvmSnapshot(Snapshot):
                                   self.mountpoint()]):
                         self.path = self.mountpoint()
                     else:
-                        self.warn('failed to mount snapshot %s on %s, skipping snapshotting'
+                        self.warn("""failed to mount snapshot %s on %s,
+skipping snapshotting"""
                                   % (self.snapname(),
                                      self.mountpoint()))
                 else:
-                    self.warn('failed to create snapshot %s/%s, skipping snapshooting'
+                    self.warn("""failed to create snapshot %s/%s,
+skipping snapshooting"""
                               % self.vg_lv)
             else:
                 # XXX: we could try to find the parent mountpoint...
@@ -319,15 +323,12 @@ class LvmSnapshot(Snapshot):
     def cleanup(self):
         if self.vg_lv is None:
             return
-        # shortcut
-        vg = self.vg_lv[0]
-        lv = self.vg_lv[1]
         m = self.mountpoint()
         # wait for bup to finish
         try:
             os.wait()
         except OSError as e:
-            if e.errno == errno.ECHILD: # no child process
+            if e.errno == errno.ECHILD:  # no child process
                 pass
             else:
                 raise
@@ -362,7 +363,9 @@ class LvmSnapshot(Snapshot):
 def process(args):
     # current lvm object to cleanup in exception handlers
     for path in args.paths:
-        with LvmSnapshot(path, args.size, log, warn, args.verbose, check_call_log) as l:
+        with LvmSnapshot(path, args.size,
+                         log, warn,
+                         args.verbose, check_call_log) as l:
             path = l.path
             # XXX: this shouldn't be in the loop like this, bup index should be
             # able to index multiple paths
@@ -389,7 +392,8 @@ def process(args):
             # XXX: this should just be args.name, but we save once per path so
             # it's cleaner to group by path
             #  -c and -t are apparently useful in case of disaster
-            cmd += ['--commit', '--tree', '--strip', '--name', args.name + '-' + path, path]
+            cmd += ['--commit', '--tree', '--strip',
+                    '--name', args.name + '-' + path, path]
             check_call_log(cmd)
             if args.parity:
                 if check_call_log(['bup', 'fsck', '--par2-ok']):
@@ -399,7 +403,8 @@ def process(args):
                     log('generating par2(1) recovery blocks')
                     check_call_log(cmd)
                 else:
-                    warn('bup reports par2(1) as not working, no recovery blocks written')
+                    warn("""bup reports par2(1) as not working,
+no recovery blocks written""")
 
 
 class Pidfile():
