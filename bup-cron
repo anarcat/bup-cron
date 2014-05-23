@@ -4,7 +4,9 @@
 simple wrapper around bup index and save designed to be ran in cron
 jobs, with support for filesystem snapshots, logging and configuration
 files.
+"""
 
+"""
 limitations
  * -c and -t are useless unless really verbose (-vv)
  * supports only LVM, assumes POSIX (so no Windows)
@@ -35,7 +37,7 @@ class ArgumentConfigParser(argparse.ArgumentParser):
 
     at least path and repo need to be specified.
 """
-    description = 'simple wrapper around bup and LVM'
+    description = __doc__
     pidfile = '.bup-cron.pid'
 
     def __init__(self):
