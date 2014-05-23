@@ -129,7 +129,7 @@ def log(msg, level=1):
 def warn(msg):
     # if log is a file, copy there
     if not args.log.isatty():
-        log(msg)
+        log(msg, 0)
     sys.stderr.write(logfmt(msg))
 
 def bail():
@@ -157,14 +157,14 @@ def init():
 def check_call_log(cmd):
     """call a procss, log it to the logfile and return false if it fails, otherwise true"""
     try:
-        log('calling command `%s`' % " ".join(cmd))
+        log('calling command `%s`' % " ".join(cmd), 2)
         if args.verbose > 1:
             stdout = args.log
         else:
             stdout = file(os.devnull)
         subprocess.check_call(cmd, stdout=stdout, stderr=args.log, close_fds=True)
     except subprocess.CalledProcessError:
-        log('command failed')
+        warn('command failed')
         return False
     return True
 
@@ -275,7 +275,7 @@ try:
         # able to index multiple paths
         #
         # unfortunately, `bup index -x / /var` skips /var...
-        log('indexing %s...' % path)
+        log('indexing %s' % path)
         # XXX: should be -q(uiet) unless verbose > 0 - but bup index has no -q
         cmd = ['bup', 'index']
         if args.verbose > 1:
@@ -288,7 +288,7 @@ try:
             warn('skipping save because index failed!')
             clean_lv()
             continue
-        log('saving')
+        log('saving %s' % path)
         # XXX: should be -q(uiet) unless verbose > 0
         cmd = ['bup', 'save']
         if args.verbose > 1:
