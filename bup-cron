@@ -316,9 +316,9 @@ pattern should have two string wildcards"""
         try:
             # --force is required to avoid confirmation
             cmd = ['lvremove', '--force', device]
-            if args.verbose <= 0:
+            if self.verbose <= 0:
                 cmd += ['--quiet']
-            if args.verbose >= 3:
+            if self.verbose >= 3:
                 cmd += ['--verbose']
             if stat.S_ISBLK(os.stat(device).st_mode):
                 if self.call(cmd):
