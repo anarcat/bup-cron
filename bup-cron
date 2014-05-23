@@ -212,19 +212,8 @@ def clean_lv():
             # normal: the device doesn't exist, moving on
             return
 
-# main loop, should be in a main() but we are stuck with a few globals
-#
-# those are:
-# args
-# lv
-# vg
-#
-# the latter two should probably be moved into a LVM singleton
-
-# XXX: this should be a "with", but first we need bup index to work properly before refactoring
-args = ArgumentConfigParser().parse_args()
-init()
-try:
+def main():
+    global vg, lv, args
     for path in args.paths:
         if args.snapshot:
             vg = lv = None
@@ -293,6 +282,12 @@ try:
         cmd += [ '-c', '-t', '--strip', '-n', args.name + '-' + path, path ]
         check_call_log(cmd)
         clean_lv()
+
+# XXX: this should be a "with", but first we need bup index to work properly before refactoring
+args = ArgumentConfigParser().parse_args()
+init()
+try:
+    main()
 except:
     # get exception type and error, but don't generate the traceback
     t, e = sys.exc_info()[:2]
