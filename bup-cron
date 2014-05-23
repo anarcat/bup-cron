@@ -9,12 +9,13 @@ files.
 """
 limitations
  * -c and -t are useless unless really verbose (-vv)
- * supports only LVM, assumes POSIX (so no Windows)
+ * assumes POSIX (so no Windows)
  * should be unit tested, at this point it's grown too big
  * see XXX below for more
 
 features missing
  * --test to run compare-tree after backup
+ * support for BTRFS, ZFS, etc
 """
 
 import os
