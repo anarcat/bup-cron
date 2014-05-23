@@ -4,6 +4,7 @@
 # * should do fsck and maybe compare-tree
 # * some hardcoded stuff (-x, lvm snapshot size, snapshot
 # mountpoint...)
+# * -c and -t are useless unless really verbose (-vv)
 # * supports only LVM, assumes POSIX (so no Windows)
 # * should be unit tested, at this point it's grown too big
 # * see XXX below for more
