@@ -20,7 +20,7 @@ import time
 import datetime
 
 class ArgumentConfigParser(argparse.ArgumentParser):
-    configs = ['/etc/bup-cron.conf', '~/.bup-cron.conf']
+    configs = ['~/.bup-cron.conf', '/etc/bup-cron.conf']
     epilog = """options can also be specified, without --, in %s.
 
 at least path and repo need to be specified
@@ -77,7 +77,7 @@ at least path and repo need to be specified
         for conf in configs:
             try:
                 with open(conf, 'r'):
-                    sys.argv.insert(1, '@' + conf)
+                    sys.argv += [ '@' + conf ]
             except IOError:
                 pass
         args = argparse.ArgumentParser.parse_args(self)
