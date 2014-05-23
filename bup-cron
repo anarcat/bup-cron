@@ -30,6 +30,7 @@ class SaferFileType(argparse.FileType):
     * crashes if logfile cannot be opened, which breaks usage
     """
     def __call__(self, string):
+        """override parent to get the behavior we want"""
         if string == '-' and 'a' in self._mode:
             self._mode = self._mode.replace('a', 'w')
         try:
@@ -51,6 +52,7 @@ class ArgumentConfigParser(argparse.ArgumentParser):
     pidfile = '.bup-cron.pid'
 
     def __init__(self):
+        """various settings for the argument parser"""
         argparse.ArgumentParser.__init__(self,
                                          description=self.description,
                                          epilog=self.epilog %
@@ -123,6 +125,10 @@ mostly useful for the configuration file""")
             return ['--' + arg_line]
 
     def parse_args(self):
+        """process argument list
+
+inject system and user config files and cleanup various arguments and
+defaults that couldn't be done otherwise"""
         configs = map(lambda x: os.path.expanduser(x), self.configs)
         for conf in configs:
             try:
@@ -163,6 +169,14 @@ false otherwise"""
         self.call = call
 
     def __enter__(self):
+        """this should be reimplemented by subclasses
+
+this should:
+
+1. create a snapshot
+2. mount it in a specific location
+3. set that location in self.path, or leave the original path in place
+otherwise"""
         return self
 
     def __exit__(self, t, e, tb):
@@ -177,15 +191,18 @@ false otherwise"""
         """this function should undo all that __enter__() did"""
         pass
 
+
 class LvmSnapshot(Snapshot):
     pattern = 'snap%s%s'
 
     def __init__(self, path, size, log=sys.stdout.write, warn=sys.stderr.write,
                  verbose=0, call=subprocess.check_call):
+        """overrides parent to set size"""
         self.size = size
         return Snapshot.__init__(self, path, log, warn, verbose, call)
 
     def __enter__(self):
+        """set the LVM and mount it"""
         self.vg_lv = None
         if os.path.ismount(self.path):
             device = self.find_device()
@@ -251,15 +268,21 @@ skipping snapshooting"""
         return re.split(r' +', re.split("\n", lvs)[1])[2:0:-1]
 
     def snapname(self):
+        """the name of the snapshot volume to be created
+
+pattern should have two string wildcards"""
         return self.pattern % self.vg_lv
 
     def mountpoint(self):
+        """where to mount the device"""
         return '/media/bup/%s' % self.snapname()
 
     def device(self):
+        """path to the device of the LV"""
         return '/dev/%s/%s' % self.vg_lv
 
     def cleanup(self):
+        """cleanup everything we did here"""
         if self.vg_lv is None:
             return
         m = self.mountpoint()
@@ -300,12 +323,21 @@ skipping snapshooting"""
 
 
 class Pidfile():
+    """this class is designed to be used with the "with" construct
+
+it will create an exclusive lockfile, detect existing ones and remove
+stale files (with invalid pids or that the process disappeared)
+
+it will also cleanup after itself"""
+
     def __init__(self, path, log=sys.stdout.write, warn=sys.stderr.write):
+        """setup various parameters"""
         self.pidfile = path
         self.log = log
         self.warn = warn
 
     def __enter__(self):
+        """initialise pid file"""
         try:
             self.pidfd = os.open(self.pidfile,
                                  os.O_CREAT | os.O_WRONLY | os.O_EXCL)
@@ -330,6 +362,7 @@ class Pidfile():
         return self
 
     def __exit__(self, t, e, tb):
+        """remove the pid file, unless we detected another process"""
         # return false to raise, true to pass
         if t is None:
             # normal condition, no exception
@@ -346,6 +379,7 @@ class Pidfile():
             return False
 
     def _remove(self):
+        """helper function to remove the pid file"""
         self.log('removed pidfile %s' % self.pidfile)
         os.remove(self.pidfile)
 
@@ -377,6 +411,7 @@ class ProcessRunningException(BaseException):
 
 
 def logfmt(msg):
+    """helper function to prepend time to messages"""
     return "%s %s\n" % (time.ctime(), msg)
 
 
@@ -387,7 +422,8 @@ def log(msg, level=1):
 
 
 def warn(msg):
-    # if log is a file, copy there
+    """log a warning to stderr and the logfile"""
+    # if log is a file, copy there, otherwise stderr is enough
     if not args.log.isatty():
         log(msg, 0)
     sys.stderr.write(logfmt(msg))
@@ -439,6 +475,7 @@ return false if it fails, otherwise true"""
 
 
 def process(args):
+    """main processing loop"""
     # current lvm object to cleanup in exception handlers
     for path in args.paths:
         with LvmSnapshot(path, args.size,
@@ -486,6 +523,7 @@ no recovery blocks written""")
 
 
 def main():
+    """main entry point, sets up error handlers and parses arguments"""
     global args, pidfd
     args = ArgumentConfigParser().parse_args()
     init()
