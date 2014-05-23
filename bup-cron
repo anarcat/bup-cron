@@ -9,6 +9,13 @@
 # * should be unit tested, at this point it's grown too big
 # * see XXX below for more
 
+# bugs
+# * logfile sees:
+# close failed in file object destructor:
+# sys.excepthook is missing
+# lost sys.stderr
+# may be related to: http://bugs.python.org/issue11380
+
 import os
 import sys
 import subprocess
