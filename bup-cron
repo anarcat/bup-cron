@@ -63,8 +63,7 @@ tries to be silent if not specified.
         # using the hostname as branch name
         self.add_argument('-n', '--name', default=socket.gethostname(),
                           help="""name of the backup passed to bup,
-defaults to hostname (%s)"""
-                          % socket.gethostname())
+defaults to hostname (%(default)s)""")
         self.add_argument('-l', '--logfile', default=sys.stdout, dest='log',
                           type=SaferFileType(mode='a', bufsize=1),
                           help="""file where logs should be written,
@@ -94,7 +93,7 @@ will be passed as --exclude-rx to bup""")
                           required=('BUP_DIR' not in os.environ),
                           default = defdir,
                           help="""the directory to backup to,
-defaults to $BUP_DIR (currently %s)"""
+defaults to $BUP_DIR (%s)"""
                           % defdir)
         # different list because dest=paths doesn't work, it gets
         # overwritten by the next one
