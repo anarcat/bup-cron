@@ -1,13 +1,19 @@
 #! /usr/bin/python
 
-# limitations
-# * -c and -t are useless unless really verbose (-vv)
-# * supports only LVM, assumes POSIX (so no Windows)
-# * should be unit tested, at this point it's grown too big
-# * see XXX below for more
+"""
+simple wrapper around bup index and save designed to be ran in cron
+jobs, with support for filesystem snapshots, logging and configuration
+files.
 
-# features to add
-# * --test to run compare-tree after backup
+limitations
+ * -c and -t are useless unless really verbose (-vv)
+ * supports only LVM, assumes POSIX (so no Windows)
+ * should be unit tested, at this point it's grown too big
+ * see XXX below for more
+
+features missing
+ * --test to run compare-tree after backup
+"""
 
 import os
 import sys
