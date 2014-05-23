@@ -224,6 +224,8 @@ false otherwise"""
 
 
 class LvmSnapshot(Snapshot):
+    pattern = 'snap%s%s'
+
     def __enter__(self):
         self.vg_lv = None
         if os.path.ismount(self.path):
@@ -295,11 +297,10 @@ class LvmSnapshot(Snapshot):
         return re.split(r' +', re.split("\n", lvs)[1])[2:0:-1]
 
     def snapname(self):
-        return 'snap%s' % self.vg_lv[1]
+        return self.pattern % self.vg_lv
 
-    # XXX: won't work across multiple VGs with conflicting LV names
     def mountpoint(self):
-        return '/media/bup/%s' % self.snapname(self.vg_lv[1])
+        return '/media/bup/%s' % self.snapname()
 
     def device(self):
         return '/dev/%s/%s' % self.vg_lv
