@@ -264,7 +264,7 @@ skipping snapshooting"""
         except:
             return False
 
-    @classmethod
+    @staticmethod
     def find_vg_lv(device):
         """find the volume group and logical volume of the specified device"""
         try:
@@ -273,7 +273,7 @@ skipping snapshooting"""
             # not a LVM
             return False
         # second line of output, second and third fields, backwards
-        return re.split(r' +', re.split("\n", lvs)[1])[2:0:-1]
+        return tuple(re.split(r' +', re.split("\n", lvs)[1])[2:0:-1])
 
     def snapname(self):
         """the name of the snapshot volume to be created
