@@ -43,13 +43,13 @@ at least path and repo need to be specified
                          help='output more information on console. tries to be silent if not specified. -v implies explaining what we do, -vv shows output of commands, -vvv passes verbose to those commands')
         # using the hostname as branch name
         self.add_argument('-n', '--name', default=socket.gethostname(),
-                            help='name of the backup passed to bup, defaults to hostname')
+                            help='name of the backup passed to bup, defaults to hostname (%s)' % socket.gethostname())
         self.add_argument('-l', '--log', default=sys.stdout, type=argparse.FileType('w'),
-                            help='file where logs should be written (default to stdout)')
+                            help='file where logs should be written, defaults to stdout')
         self.add_argument('--clear', action='store_true',
                             help='redo a full backup (runs bup index --clear before starting)')
         self.add_argument('-s', '--snapshot', nargs='?', const='lvm', choices=['lvm'],
-                            help='snapshot filesystem to make backup. this will automatically guess the path to the logical volume (if relevant) and create a snapshot, mount it, then remove it when it is done.')
+                            help='snapshot filesystem before backup. this will automatically guess the path to the logical volume (if relevant) and create a snapshot, mount it, then remove it when it is done.')
         self.add_argument('-x', '--exclude', action='append',
                             help='exclude regex pattern, will be passed as --exclude-rx to bup')
         if 'BUP_DIR' in os.environ:
