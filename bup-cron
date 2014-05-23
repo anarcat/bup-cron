@@ -227,41 +227,36 @@ class LvmSnapshot(Snapshot):
     def __enter__(self):
         self.vg_lv = None
         if os.path.ismount(self.path):
-            device = self.find_device(self.path)
+            device = self.find_device()
             if device:
                 # vg, lv
                 self.vg_lv = self.find_vg_lv(device)
             if device and self.vg_lv:
-                # shortcuts
-                vg = self.vg_lv[0]
-                lv = self.vg_lv[1]
-                self.clean_lv()
+                self.cleanup()
                 # XXX: snapshot size hardcoded
                 cmd = ['lvcreate', '--size', '1GB', '--snapshot',
-                       '-n', self.snapname(lv), device]
+                       '-n', self.snapname(), device]
                 if self.verbose < 1:
                     cmd += ['-q']
                 if self.verbose > 1:
                     cmd += ['-v']
                 if self.call(cmd):
                     try:
-                        os.chdir(self.snapmount(self.snapname(lv)))
+                        os.chdir(self.mountpoint())
                     except OSError:
                         self.log('creating missing mountpoint %s'
-                                 % self.snapmount(self.snapname(lv)))
-                        os.makedirs(self.snapmount(self.snapname(lv)))
-                    if self.call(['mount', self.lvdev(vg, self.snapname(lv)),
-                                  self.snapmount(self.snapname(lv))]):
-                        self.path = self.snapmount(self.snapname(lv))
+                                 % self.mountpoint())
+                        os.makedirs(self.mountpoint())
+                    if self.call(['mount', self.device(),
+                                  self.mountpoint()]):
+                        self.path = self.mountpoint()
                     else:
                         self.warn('failed to mount snapshot %s on %s, skipping snapshotting'
-                                  % (self.snapname(lv),
-                                     self.snapmount(self.snapname(lv))))
-                        lv = vg = None
+                                  % (self.snapname(),
+                                     self.mountpoint()))
                 else:
-                    self.warn('failed to create snapshot for LV %s on VG %s, skipping snapshooting'
-                              % (lv, vg))
-                    lv = vg = None
+                    self.warn('failed to create snapshot %s/%s, skipping snapshooting'
+                              % self.vg_lv)
             else:
                 # XXX: we could try to find the parent mountpoint...
                 warn('%s is not a LVM mountpoint, skipping snapshotting'
@@ -272,20 +267,20 @@ class LvmSnapshot(Snapshot):
 
     def __exit__(self, t, e, tb):
         # return false to raise, true to pass
-        self.clean_lv()
+        self.cleanup()
         return t is None
 
     def __del__(self):
-        self.clean_lv()
+        self.cleanup()
 
-    def find_device(self, path):
+    def find_device(self):
         """find device based on mountpoint path
 
         returns the device or False if none found"""
 
         mounts = subprocess.check_output(['mount'])
         try:
-            return re.match(r".*^(/[^ ]*) on %s .*" % path, mounts,
+            return re.match(r".*^(/[^ ]*) on %s .*" % self.path, mounts,
                             re.MULTILINE | re.DOTALL).group(1)
         except:
             return False
@@ -299,23 +294,23 @@ class LvmSnapshot(Snapshot):
         # second line of output, second and third fields, backwards
         return re.split(r' +', re.split("\n", lvs)[1])[2:0:-1]
 
-    def snapname(self, lv):
-        return 'snap%s' % lv
+    def snapname(self):
+        return 'snap%s' % self.vg_lv[1]
 
     # XXX: won't work across multiple VGs with conflicting LV names
-    def snapmount(self, name):
-        return '/media/bup/%s' % name
+    def mountpoint(self):
+        return '/media/bup/%s' % self.snapname(self.vg_lv[1])
 
-    def lvdev(self, vg, lv):
-        return '/dev/%s/%s' % (vg, lv)
+    def device(self):
+        return '/dev/%s/%s' % self.vg_lv
 
-    def clean_lv(self):
+    def cleanup(self):
         if self.vg_lv is None:
             return
         # shortcut
         vg = self.vg_lv[0]
         lv = self.vg_lv[1]
-        m = self.snapmount(self.snapname(lv))
+        m = self.mountpoint()
         # wait for bup to finish
         try:
             os.wait()
@@ -334,7 +329,7 @@ class LvmSnapshot(Snapshot):
             self.log('removed directory %s' % m)
         except:
             pass
-        device = self.lvdev(vg, self.snapname(lv))
+        device = self.device()
         try:
             cmd = ['lvremove', '-f', device]
             if args.verbose < 1:
