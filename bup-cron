@@ -337,7 +337,14 @@ it will also cleanup after itself"""
         self.warn = warn
 
     def __enter__(self):
-        """initialise pid file"""
+        """wrapper around create() to work with the 'with' statement"""
+        return self.create()
+
+    def __exit__(self, t, e, tb):
+        return self.remove()
+
+    def create(self):
+        """initialise pid file"""        
         try:
             self.pidfd = os.open(self.pidfile,
                                  os.O_CREAT | os.O_WRONLY | os.O_EXCL)
@@ -360,7 +367,7 @@ it will also cleanup after itself"""
         os.close(self.pidfd)
         return self
 
-    def __exit__(self, t, e, tb):
+    def remove(self):
         """remove the pid file, unless we detected another process"""
         # return false to raise, true to pass
         if t is None:
@@ -378,7 +385,7 @@ it will also cleanup after itself"""
             return False
 
     def _remove(self):
-        """helper function to remove the pid file"""
+        """helper function to actually remove the pid file"""
         self.log('removed pidfile %s' % self.pidfile)
         os.remove(self.pidfile)
 
