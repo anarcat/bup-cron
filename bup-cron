@@ -156,8 +156,10 @@ def warn(msg):
 
 def bail(status, msg=None):
     """cleanup on exit"""
-    global start
-    clean_lv()
+    global start, lvm
+    # cleanup global lvm
+    if lvm:
+        lvm.clean_lv()
     if msg:
         warn(msg)
     utimes = 'user %s system %s chlduser %s chldsystem %s' % os.times()[:4]
@@ -200,53 +202,130 @@ return false if it fails, otherwise true"""
     return True
 
 
-def find_device(path):
-    """find device based on mountpoint path
+class Snapshot():
+    def __init__(self, path, log=sys.stdout.write, warn=sys.stderr.write, verbose=0, call=subprocess.check_call):
+        """initialise the snapshot array
 
-    returns the device or False if none found"""
+path is expected to be the root of the filesystem
+log and warn are logging utilities
+call is a way to call processes that will return true on success or false otherwise"""
+        self.path = path
+        self.log = log
+        self.warn = warn
+        self.verbose = verbose
+        self.call = call
 
-    mounts = subprocess.check_output(['mount'])
-    try:
-        return re.match(r".*^(/[^ ]*) on %s .*" % path, mounts,
-                        re.MULTILINE | re.DOTALL).group(1)
-    except:
-        return False
+    def __enter__(self):
+        return self
 
+    def __exit__(self, t, e, tb):
+        # return false to raise, true to pass
+        pass
 
-def find_vg_lv(device):
-    try:
-        lvs = subprocess.check_output(['lvs', device], close_fds=True)
-    except subprocess.CalledProcessError:
-        # not a LVM
-        return False
-    # second line of output, second and third fields, backwards
-    return re.split(r' +', re.split("\n", lvs)[1])[2:0:-1]
+class LvmSnapshot(Snapshot):
+    def __enter__(self):
+        self.vg_lv = None
+        if os.path.ismount(self.path):
+            device = self.find_device(self.path)
+            if device:
+                # vg, lv
+                self.vg_lv = self.find_vg_lv(device)
+            if device and self.vg_lv:
+                # shortcuts
+                vg = self.vg_lv[0]
+                lv = self.vg_lv[1]
+                self.log('umounting and removing previous snapshot %s, if present (errors ignored)'
+                    % self.lvdev(vg, self.snapname(lv)))
+                self.clean_lv()
+                # XXX: snapshot size hardcoded
+                cmd = ['lvcreate', '--size', '1GB', '--snapshot',
+                       '-n', self.snapname(lv), device]
+                if self.verbose < 1:
+                    cmd += ['-q']
+                if self.verbose > 1:
+                    cmd += ['-v']
+                if self.call(cmd):
+                    try:
+                        os.chdir(self.snapmount(self.snapname(lv)))
+                    except OSError:
+                        self.log('creating missing mountpoint %s'
+                            % self.snapmount(self.snapname(lv)))
+                        os.makedirs(self.snapmount(self.snapname(lv)))
+                    if self.call(['mount', self.lvdev(vg, self.snapname(lv)),
+                                       self.snapmount(self.snapname(lv))]):
+                        self.path = self.snapmount(self.snapname(lv))
+                    else:
+                        self.warn('failed to mount snapshot %s on %s, skipping snapshotting'
+                             % (self.snapname(lv), self.snapmount(self.snapname(lv))))
+                        lv = vg = None
+                else:
+                    self.warn('failed to create snapshot for LV %s on VG %s, skipping snapshooting'
+                         % (lv, vg))
+                    lv = vg = None
+            else:
+                # XXX: we could try to find the parent mountpoint...
+                warn('%s is not a LVM mountpoint, skipping snapshotting'
+                     % self.path)
+        else:
+            warn('%s is not a mountpoint, skipping snapshotting' % self.path)
+        return self
 
+    def __exit__(self, t, e, tb):
+        # return false to raise, true to pass
+        self.clean_lv()
+        return t is None
 
-def snapname(lv):
-    return 'snap%s' % lv
+    def find_device(self, path):
+        """find device based on mountpoint path
 
+        returns the device or False if none found"""
 
-# XXX: won't work across multiple VGs with conflicting LV names
-def snapmount(name):
-    return '/media/bup/%s' % name
-
-
-def lvdev(vg, lv):
-    return '/dev/%s/%s' % (vg, lv)
-
-
-def clean_lv():
-    if args.snapshot and vg and lv:
-        m = snapmount(snapname(lv))
-        if os.path.ismount(m) and not check_call_log(['umount', m]):
-            warn('failed to umount %s' % m)
+        mounts = subprocess.check_output(['mount'])
         try:
-            log('removing directory %s' % m)
+            return re.match(r".*^(/[^ ]*) on %s .*" % path, mounts,
+                            re.MULTILINE | re.DOTALL).group(1)
+        except:
+            return False
+
+
+    def find_vg_lv(self, device):
+        try:
+            lvs = subprocess.check_output(['lvs', device], close_fds=True)
+        except subprocess.CalledProcessError:
+            # not a LVM
+            return False
+        # second line of output, second and third fields, backwards
+        return re.split(r' +', re.split("\n", lvs)[1])[2:0:-1]
+
+
+    def snapname(self, lv):
+        return 'snap%s' % lv
+
+
+    # XXX: won't work across multiple VGs with conflicting LV names
+    def snapmount(self, name):
+        return '/media/bup/%s' % name
+
+
+    def lvdev(self, vg, lv):
+        return '/dev/%s/%s' % (vg, lv)
+
+
+    def clean_lv(self):
+        if self.vg_lv is None:
+            return
+        # shortcut
+        vg = self.vg_lv[0]
+        lv = self.vg_lv[1]
+        m = self.snapmount(self.snapname(lv))
+        if os.path.ismount(m) and not self.call(['umount', m]):
+            self.warn('failed to umount %s' % m)
+        try:
+            self.log('removing directory %s' % m)
             os.removedirs(m)
         except:
             pass
-        device = lvdev(vg, snapname(lv))
+        device = self.lvdev(vg, self.snapname(lv))
         try:
             cmd = ['lvremove', '-f', device]
             if args.verbose < 1:
@@ -254,91 +333,48 @@ def clean_lv():
             if args.verbose > 1:
                 cmd += ['-v']
             if stat.S_ISBLK(os.stat(device).st_mode) and \
-                    not check_call_log(cmd):
-                warn('failed to drop snapshot %s' % device)
+                    not self.call(cmd):
+                self.warn('failed to drop snapshot %s' % device)
         except OSError:
             # normal: the device doesn't exist, moving on
             return
 
 
-def process(args):
-    global vg, lv
-    for path in args.paths:
-        if args.snapshot:
-            vg = lv = None
-            # XXX: all of this should be moved to a Snapshot class,
-            # subclassed as LvmSnapshot it can then be instantiated
-            # depending on the value of args.snapshot
-            if os.path.ismount(path):
-                device = find_device(path)
-                if device:
-                    lvs = find_vg_lv(device)
-                if device and lvs:
-                    vg = lvs[0]
-                    lv = lvs[1]
-                    log('umounting and removing previous snapshot %s, if present (errors ignored)'
-                        % lvdev(vg, snapname(lv)))
-                    clean_lv()
-                    # XXX: snapshot size hardcoded
-                    cmd = ['lvcreate', '--size', '1GB', '--snapshot',
-                           '-n', snapname(lv), device]
-                    if args.verbose < 1:
-                        cmd += ['-q']
-                    if args.verbose > 1:
-                        cmd += ['-v']
-                    if check_call_log(cmd):
-                        try:
-                            os.chdir(snapmount(snapname(lv)))
-                        except OSError:
-                            log('creating missing mountpoint %s'
-                                % snapmount(snapname(lv)))
-                            os.makedirs(snapmount(snapname(lv)))
-                        if check_call_log(['mount', lvdev(vg, snapname(lv)),
-                                           snapmount(snapname(lv))]):
-                            path = snapmount(snapname(lv))
-                        else:
-                            warn('failed to mount snapshot %s on %s, skipping snapshotting'
-                                 % (snapname(lv), snapmount(snapname(lv))))
-                            lv = vg = None
-                    else:
-                        warn('failed to create snapshot for LV %s on VG %s, skipping snapshooting'
-                             % (lv, vg))
-                        lv = vg = None
-                else:
-                    # XXX: we could try to find the parent mountpoint...
-                    warn('%s is not a LVM mountpoint, skipping snapshotting'
-                         % path)
-            else:
-                warn('%s is not a mountpoint, skipping snapshotting' % path)
 
-        # XXX: this shouldn't be in the loop like this, bup index should be
-        # able to index multiple paths
-        #
-        # unfortunately, `bup index -x / /var` skips /var...
-        log('indexing %s' % path)
-        # XXX: should be -q(uiet) unless verbose > 0 - but bup index has no -q
-        cmd = ['bup', 'index']
-        if args.verbose > 1:
-            cmd += ['-v']
-        if args.exclude:
-            cmd += map((lambda ex: '--exclude-rx=' + ex), args.exclude)
-        # XXX: -x hardcoded?
-        cmd += ['-x', path]
-        if not check_call_log(cmd):
-            warn('skipping save because index failed!')
-            clean_lv()
-            continue
-        log('saving %s' % path)
-        # XXX: should be -q(uiet) unless verbose > 0
-        cmd = ['bup', 'save']
-        if args.verbose > 1:
-            cmd += ['-v']
-        # XXX: this should just be args.name, but we save once per path so
-        # it's cleaner to group by path
-        #  -c and -t are apparently useful in case of disaster
-        cmd += ['-c', '-t', '--strip', '-n', args.name + '-' + path, path]
-        check_call_log(cmd)
-        clean_lv()
+def process(args):
+    # current lvm object to cleanup in exception handlers
+    global lvm
+    for path in args.paths:
+        with LvmSnapshot(path, log, warn, args.verbose, check_call_log) as l:
+            lvm = l
+            path = l.path
+            # XXX: this shouldn't be in the loop like this, bup index should be
+            # able to index multiple paths
+            #
+            # unfortunately, `bup index -x / /var` skips /var...
+            log('indexing %s' % path)
+            # XXX: should be -q(uiet) unless verbose > 0 - but bup index has no -q
+            cmd = ['bup', 'index']
+            if args.verbose > 1:
+                cmd += ['-v']
+            if args.exclude:
+                cmd += map((lambda ex: '--exclude-rx=' + ex), args.exclude)
+            # XXX: -x hardcoded?
+            cmd += ['-x', path]
+            if not check_call_log(cmd):
+                warn('skipping save because index failed!')
+                continue
+            log('saving %s' % path)
+            # XXX: should be -q(uiet) unless verbose > 0
+            cmd = ['bup', 'save']
+            if args.verbose > 1:
+                cmd += ['-v']
+            # XXX: this should just be args.name, but we save once per path so
+            # it's cleaner to group by path
+            #  -c and -t are apparently useful in case of disaster
+            cmd += ['-c', '-t', '--strip', '-n', args.name + '-' + path, path]
+            check_call_log(cmd)
+            lvm = None
 
 
 class Pidfile():
