@@ -19,6 +19,7 @@ import time
 import datetime
 import errno
 
+
 class SaferFileType(argparse.FileType):
     """Factory for creating file object types
 
@@ -35,6 +36,7 @@ class SaferFileType(argparse.FileType):
         except argparse.ArgumentTypeError as e:
             sys.stderr.write(str(e) + "\n")
             return sys.stdout
+
 
 class ArgumentConfigParser(argparse.ArgumentParser):
     configs = ['/etc/bup-cron.conf', '~/.bup-cron.conf']
@@ -116,13 +118,16 @@ class ArgumentConfigParser(argparse.ArgumentParser):
             args.pidfile = os.path.join(os.environ['BUP_DIR'], self.pidfile)
         return args
 
+
 def logfmt(msg):
     return "%s %s\n" % (time.ctime(), msg)
+
 
 def log(msg, level=1):
     """log message to stdout or logfile, depending on --log"""
     if args.verbose >= level:
         args.log.write(logfmt(msg))
+
 
 def warn(msg):
     # if log is a file, copy there
@@ -130,7 +135,8 @@ def warn(msg):
         log(msg, 0)
     sys.stderr.write(logfmt(msg))
 
-def bail(status,msg=None):
+
+def bail(status, msg=None):
     """cleanup on exit"""
     global start
     clean_lv()
@@ -140,6 +146,7 @@ def bail(status,msg=None):
     log('finished in %s (%s)' % (str(datetime.datetime.now() - start), utimes))
     args.log.close()
     sys.exit(status)
+
 
 def init():
     """initialise the repo and do other housecleaning"""
@@ -156,6 +163,7 @@ def init():
             log('clearing log')
             check_call_log(['bup', 'index', '--clear'])
 
+
 def check_call_log(cmd):
     """call a procss, log it to the logfile and return false if it fails, otherwise true"""
     try:
@@ -170,6 +178,7 @@ def check_call_log(cmd):
         return False
     return True
 
+
 def find_device(path):
     """find device based on mountpoint path, return the re.match (so None if not found)"""
     mounts = subprocess.check_output(['mount'])
@@ -177,6 +186,7 @@ def find_device(path):
         return re.match(r".*^(/[^ ]*) on %s .*" % path, mounts, re.MULTILINE | re.DOTALL).group(1)
     except:
         return False
+
 
 def find_vg_lv(device):
     try:
@@ -187,15 +197,19 @@ def find_vg_lv(device):
     # second line of output, second and third fields, backwards
     return re.split(r' +', re.split("\n", lvs)[1])[2:0:-1]
 
+
 def snapname(lv):
     return 'snap%s' % lv
+
 
 # XXX: won't work across multiple VGs with conflicting LV names
 def snapmount(name):
     return '/media/bup/%s' % name
 
+
 def lvdev(vg, lv):
-    return '/dev/%s/%s' % ( vg, lv )
+    return '/dev/%s/%s' % (vg, lv)
+
 
 def clean_lv():
     if args.snapshot and vg and lv:
@@ -211,14 +225,15 @@ def clean_lv():
         try:
             cmd = ['lvremove', '-f', device]
             if args.verbose < 1:
-                cmd += [ '-q' ]
+                cmd += ['-q']
             if args.verbose > 1:
-                cmd += [ '-v' ]
+                cmd += ['-v']
             if stat.S_ISBLK(os.stat(device).st_mode) and not check_call_log(cmd):
                 warn('failed to drop snapshot %s' % device)
-        except OSError as e:
+        except OSError:
             # normal: the device doesn't exist, moving on
             return
+
 
 def process(args):
     global vg, lv
@@ -239,9 +254,9 @@ def process(args):
                     # XXX: snapshot size hardcoded
                     cmd = ['lvcreate', '--size', '1GB', '--snapshot', '-n', snapname(lv), device]
                     if args.verbose < 1:
-                        cmd += [ '-q' ]
+                        cmd += ['-q']
                     if args.verbose > 1:
-                        cmd += [ '-v' ]
+                        cmd += ['-v']
                     if check_call_log(cmd):
                         try:
                             os.chdir(snapmount(snapname(lv)))
@@ -270,11 +285,11 @@ def process(args):
         # XXX: should be -q(uiet) unless verbose > 0 - but bup index has no -q
         cmd = ['bup', 'index']
         if args.verbose > 1:
-            cmd += [ '-v' ]
+            cmd += ['-v']
         if args.exclude:
             cmd += map((lambda ex: '--exclude-rx=' + ex), args.exclude)
         # XXX: -x hardcoded?
-        cmd += [ '-x', path ]
+        cmd += ['-x', path]
         if not check_call_log(cmd):
             warn('skipping save because index failed!')
             clean_lv()
@@ -283,13 +298,14 @@ def process(args):
         # XXX: should be -q(uiet) unless verbose > 0
         cmd = ['bup', 'save']
         if args.verbose > 1:
-            cmd += [ '-v' ]
+            cmd += ['-v']
         # XXX: this should just be args.name, but we save once per path so
         # it's cleaner to group by path
         #  -c and -t are apparently useful in case of disaster
-        cmd += [ '-c', '-t', '--strip', '-n', args.name + '-' + path, path ]
+        cmd += ['-c', '-t', '--strip', '-n', args.name + '-' + path, path]
         check_call_log(cmd)
         clean_lv()
+
 
 class Pidfile():
     def __init__(self, path, log=sys.stdout.write, warn=sys.stderr.write):
@@ -299,18 +315,18 @@ class Pidfile():
 
     def __enter__(self):
         try:
-            self.pidfd = os.open(self.pidfile, os.O_CREAT|os.O_WRONLY|os.O_EXCL)
+            self.pidfd = os.open(self.pidfile, os.O_CREAT | os.O_WRONLY | os.O_EXCL)
             self.log('locked pidfile %s' % self.pidfile)
         except OSError as e:
             if e.errno == errno.EEXIST:
                 pid = self._check()
                 if pid:
                     self.pidfd = None
-                    raise ProcessRunningException('process already running in %s as pid %s' % (self.pidfile, pid));
+                    raise ProcessRunningException('process already running in %s as pid %s' % (self.pidfile, pid))
                 else:
                     os.remove(self.pidfile)
                     self.warn('removed staled lockfile %s' % (self.pidfile))
-                    self.pidfd = os.open(self.pidfile, os.O_CREAT|os.O_WRONLY|os.O_EXCL)
+                    self.pidfd = os.open(self.pidfile, os.O_CREAT | os.O_WRONLY | os.O_EXCL)
             else:
                 raise
 
@@ -324,7 +340,7 @@ class Pidfile():
             # normal condition, no exception
             self._remove()
             return True
-        elif t is PidfileProcessRunningException:
+        elif t is ProcessRunningException:
             # do not remove the other process lockfile
             return False
         else:
@@ -363,6 +379,7 @@ if it is still running, returns the pid, if not, return False."""
 
 class ProcessRunningException(BaseException):
     pass
+
 
 def main():
     global args, pidfd
