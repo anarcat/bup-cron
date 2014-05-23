@@ -233,6 +233,7 @@ init()
 try:
     for path in args.paths:
         if args.snapshot:
+            vg = lv = None
             # XXX: all of this should be moved to a Snapshot class, subclassed as LvmSnapshot
             # it can then be instantiated depending on the value of args.snapshot
             if os.path.ismount(path):
