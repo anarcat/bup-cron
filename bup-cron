@@ -56,24 +56,27 @@ tries to be silent if not specified.
         # using the hostname as branch name
         self.add_argument('-n', '--name', default=socket.gethostname(),
                           help="""name of the backup passed to bup,
-defaults to hostname (%(default)s)""")
+                                  defaults to hostname (%(default)s)""")
         self.add_argument('-l', '--logfile', default=sys.stdout, dest='log',
                           type=SaferFileType(mode='a', bufsize=1),
                           help="""file where logs should be written,
-defaults to stdout""")
+                                  defaults to stdout""")
         self.add_argument('--pidfile', default=None, action='store',
-                          help="""lockfile to write to avoid simultanous
-execution, defaults to $BUP_DIR/%s"""
+                          help="""lockfile to write to avoid
+                                  simultanous execution, defaults to
+                                  $BUP_DIR/%s"""
                           % self.pidfile)
         self.add_argument('-s', '--snapshot', nargs='?',
                           const='lvm', choices=['lvm'],
                           help="""snapshot filesystem before backup.
-this will automatically guess the path to the logical volume,
-create a snapshot, mount it, then remove it when it is done.""")
+                                  this will automatically guess the
+                                  path to the logical volume, create a
+                                  snapshot, mount it, then remove it
+                                  when it is done.""")
         self.add_argument('-z', '--size', action='store',
                           default=Snapshot.size,
                           help="""size of the LVM snapshot,
-defaults to %(default)s""")
+                                  defaults to %(default)s""")
         self.add_argument('-m', '--mountpoint', action='store',
                           default=Snapshot.mountpattern,
                           help="""mountpoint of the snapshot device.
@@ -82,13 +85,13 @@ defaults to %(default)s""")
                                   %(default)s)""")
         self.add_argument('--clear', action='store_true',
                           help="""redo a full backup
-(runs bup index --clear before starting)""")
+                                  (runs bup index --clear before starting)""")
         self.add_argument('-x', '--exclude', action='append',
                           help="""exclude regex pattern,
 will be passed as --exclude-rx to bup""")
         self.add_argument('--parity', action='store_true',
                           help="""generate recovery blocks after backup.
-runs bup fsck -g after the backup, requires par2(1).""")
+                                  runs bup fsck -g after the backup, requires par2(1).""")
         if 'BUP_DIR' in os.environ:
             defdir = os.environ['BUP_DIR']
         else:
@@ -96,8 +99,8 @@ runs bup fsck -g after the backup, requires par2(1).""")
         self.add_argument('-r', '--repository',
                           required=('BUP_DIR' not in os.environ),
                           default = defdir,
-                          help="""the directory to backup to,
-defaults to $BUP_DIR (%s)"""
+                          help="""the directory to backup to, defaults
+                                  to $BUP_DIR (%s)"""
                           % defdir)
         # different list because dest=paths doesn't work, it gets
         # overwritten by the next one
@@ -105,13 +108,12 @@ defaults to $BUP_DIR (%s)"""
         # for the config file
         self.add_argument('-p', '--path', action='append',
                           help="""add path to list of paths to backup,
-mostly useful for the configuration file""")
+                                  mostly useful for the configuration file""")
         # XXX: this should be mandatory, or at least --path or --paths should
         self.add_argument('paths', nargs='*', help='list of paths to backup')
 
     def convert_arg_line_to_args(self, arg_line):
-        """parse a config file that looks like this:
-"""
+        """parse a config file"""
         # skip whitespace and commented lines
         if re.match('^(#|[\s]*$)', arg_line):
             return []
@@ -122,8 +124,8 @@ mostly useful for the configuration file""")
     def parse_args(self):
         """process argument list
 
-inject system and user config files and cleanup various arguments and
-defaults that couldn't be done otherwise"""
+        inject system and user config files and cleanup various
+        arguments and defaults that couldn't be done otherwise"""
         configs = map(lambda x: os.path.expanduser(x), self.configs)
         for conf in configs:
             try:
@@ -175,10 +177,9 @@ class Snapshot():
                  verbose=0, call=subprocess.check_call, mountpattern=None):
         """initialise the snapshot array
 
-path is expected to be the root of the filesystem
-log and warn are logging utilities
-call is a way to call processes that will return true on success or
-false otherwise"""
+        path is expected to be the root of the filesystem log and warn
+        are logging utilities call is a way to call processes that
+        will return true on success or false otherwise"""
         self.path = path
         self.size = size
         self.log = log
@@ -191,12 +192,12 @@ false otherwise"""
     def __enter__(self):
         """this should be reimplemented by subclasses
 
-this should:
+        this should:
 
-1. create a snapshot
-2. mount it in a specific location
-3. set that location in self.path, or leave the original path in place
-otherwise"""
+        1. create a snapshot
+        2. mount it in a specific location
+        3. set that location in self.path, or leave the original path
+        in place otherwise"""
         return self
 
     def __exit__(self, t, e, tb):
@@ -279,7 +280,8 @@ skipping snapshooting"""
     def snapname(self):
         """the name of the snapshot volume to be created
 
-pattern should have two string wildcards, one for vg, the other for lv"""
+        pattern should have two string wildcards, one for vg, the
+        other for lv"""
         return 'snap%s' % self.vg_lv[1]
 
     def mountpoint(self):
@@ -334,10 +336,11 @@ pattern should have two string wildcards, one for vg, the other for lv"""
 class Pidfile():
     """this class is designed to be used with the "with" construct
 
-it will create an exclusive lockfile, detect existing ones and remove
-stale files (with invalid pids or that the process disappeared)
+    it will create an exclusive lockfile, detect existing ones and
+    remove stale files (with invalid pids or that the process
+    disappeared)
 
-it will also cleanup after itself"""
+    it will also cleanup after itself"""
 
     def __init__(self, path, log=sys.stdout.write, warn=sys.stderr.write):
         """setup various parameters"""
@@ -398,9 +401,11 @@ it will also cleanup after itself"""
     def _check(self):
         """check if a process is still running
 
-the process id is expected to be in pidfile, which should exist.
+        the process id is expected to be in pidfile, which should
+        exist.
 
-if it is still running, returns the pid, if not, return False."""
+        if it is still running, returns the pid, if not, return
+        False."""
         with open(self.pidfile, 'r') as f:
             try:
                 pidstr = f.read()
@@ -482,7 +487,7 @@ def init():
 def check_call_log(cmd):
     """call a procss, log it to the logfile
 
-return false if it fails, otherwise true"""
+    return false if it fails, otherwise true"""
     global __ARGS
     try:
         log('calling command `%s`' % " ".join(cmd), 2)
