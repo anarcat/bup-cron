@@ -60,14 +60,12 @@ at least path and repo need to be specified
                           required=('BUP_DIR' not in os.environ),
                           default = defdir,
                           help='the directory to backup to, defaults to $BUP_DIR (currently %s)' % defdir)
-        # different list because dest=paths doesn't work, it gets
-        # overwritten by the next one
-        # XXX: we'd like to not see this in the usage as well, as it's
-        # for the config file
-        self.add_argument('-p', '--path', action='append',
+        # XXX: different list because dest=paths doesn't work, it gets
+        # overwritten by "paths"
+        group = self.add_mutually_exclusive_group(required=True)
+        group.add_argument('-p', '--path', action='append',
                             help='add path to list of paths to backup, mostly useful for the configuration file')
-        # XXX: this should be mandatory, or at least --path or --paths should
-        self.add_argument('paths', nargs='*', help='list of paths to backup')
+        group.add_argument('paths', nargs='*', help='list of paths to backup')
 
     def convert_arg_line_to_args(self, arg_line):
         """parse a config file that looks like this:
