@@ -8,7 +8,6 @@ files.
 
 """
 limitations
- * -c and -t are useless unless really verbose (-vv)
  * assumes POSIX (so no Windows)
  * should be unit tested, at this point it's grown too big
  * see XXX below for more
@@ -222,9 +221,9 @@ class LvmSnapshot(Snapshot):
                 self.cleanup()
                 cmd = ['lvcreate', '--size', self.size, '--snapshot',
                        '--name', self.snapname(), device]
-                if self.verbose < 1:
+                if self.verbose <= 0:
                     cmd += ['--quiet']
-                if self.verbose > 1:
+                if self.verbose >= 3:
                     cmd += ['--verbose']
                 if self.call(cmd):
                     try:
@@ -317,9 +316,9 @@ pattern should have two string wildcards"""
         try:
             # --force is required to avoid confirmation
             cmd = ['lvremove', '--force', device]
-            if args.verbose < 1:
+            if args.verbose <= 0:
                 cmd += ['--quiet']
-            if args.verbose > 1:
+            if args.verbose >= 3:
                 cmd += ['--verbose']
             if stat.S_ISBLK(os.stat(device).st_mode):
                 if self.call(cmd):
@@ -485,7 +484,7 @@ def check_call_log(cmd):
 return false if it fails, otherwise true"""
     try:
         log('calling command `%s`' % " ".join(cmd), 2)
-        if args.verbose > 1:
+        if args.verbose >= 2:
             stdout = args.log
         else:
             stdout = file(os.devnull)
@@ -513,7 +512,7 @@ def process(args):
             # XXX: should be -q(uiet) unless verbose > 0 - but bup
             # index has no -q
             cmd = ['bup', 'index']
-            if args.verbose > 1:
+            if args.verbose >= 3:
                 cmd += ['--verbose']
             if args.exclude:
                 cmd += map((lambda ex: '--exclude-rx=' + ex), args.exclude)
@@ -523,20 +522,22 @@ def process(args):
                 continue
             log('saving %s' % path)
             cmd = ['bup', 'save']
-            if args.verbose < 1:
+            if args.verbose <= 0:
                 cmd += ['--quiet']
-            if args.verbose > 1:
+            if args.verbose >= 3:
                 cmd += ['--verbose']
             # XXX: this should just be args.name, but we save once per path so
             # it's cleaner to group by path
+            cmd += ['--strip', '--name', args.name + '-' + path, path]
             #  -c and -t are apparently useful in case of disaster
-            cmd += ['--commit', '--tree', '--strip',
-                    '--name', args.name + '-' + path, path]
+            # unfortunately, there are useless if we don't show the output
+            if args.verbose >= 2:
+                cmd += ['--commit', '--tree']
             check_call_log(cmd)
             if args.parity:
                 if check_call_log(['bup', 'fsck', '--par2-ok']):
                     cmd = ['bup', 'fsck', '--generate']
-                    if args.verbose > 1:
+                    if args.verbose >= 3:
                         cmd += ['--verbose']
                     log('generating par2(1) recovery blocks')
                     check_call_log(cmd)
