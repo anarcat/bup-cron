@@ -56,24 +56,35 @@ class ArgumentConfigParser(argparse.ArgumentParser):
                                          " or ".join(self.configs),
                                          fromfile_prefix_chars='@')
         self.add_argument('-v', '--verbose', action='count',
-                          help='output more information on console. tries to be silent if not specified. -v implies explaining what we do, -vv shows output of commands, -vvv passes verbose to those commands')
+                          help="""output more information on console.
+tries to be silent if not specified.
+-v implies explaining what we do,
+-vv shows output of commands,
+-vvv passes verbose to those commands""")
         # using the hostname as branch name
         self.add_argument('-n', '--name', default=socket.gethostname(),
-                          help='name of the backup passed to bup, defaults to hostname (%s)'
+                          help="""name of the backup passed to bup,
+defaults to hostname (%s)"""
                           % socket.gethostname())
         self.add_argument('-l', '--logfile', default=sys.stdout, dest='log',
                           type=SaferFileType(mode='a', bufsize=1),
-                          help='file where logs should be written, defaults to stdout')
+                          help="""file where logs should be written,
+defaults to stdout""")
         self.add_argument('--pidfile', default=None, action='store',
-                          help='lockfile to write to avoid simultanous execution, defaults to $BUP_DIR/%s'
+                          help="""lockfile to write to avoid simultanous
+execution, defaults to $BUP_DIR/%s"""
                           % self.pidfile)
         self.add_argument('--clear', action='store_true',
-                          help='redo a full backup (runs bup index --clear before starting)')
+                          help="""redo a full backup
+(runs bup index --clear before starting)""")
         self.add_argument('-s', '--snapshot', nargs='?',
                           const='lvm', choices=['lvm'],
-                          help='snapshot filesystem before backup. this will automatically guess the path to the logical volume (if relevant) and create a snapshot, mount it, then remove it when it is done.')
+                          help="""snapshot filesystem before backup.
+this will automatically guess the path to the logical volume,
+create a snapshot, mount it, then remove it when it is done.""")
         self.add_argument('-x', '--exclude', action='append',
-                          help='exclude regex pattern, will be passed as --exclude-rx to bup')
+                          help="""exclude regex pattern,
+will be passed as --exclude-rx to bup""")
         if 'BUP_DIR' in os.environ:
             defdir = os.environ['BUP_DIR']
         else:
@@ -81,14 +92,16 @@ class ArgumentConfigParser(argparse.ArgumentParser):
         self.add_argument('-r', '--repository',
                           required=('BUP_DIR' not in os.environ),
                           default = defdir,
-                          help='the directory to backup to, defaults to $BUP_DIR (currently %s)'
+                          help="""the directory to backup to,
+defaults to $BUP_DIR (currently %s)"""
                           % defdir)
         # different list because dest=paths doesn't work, it gets
         # overwritten by the next one
         # XXX: we'd like to not see this in the usage as well, as it's
         # for the config file
         self.add_argument('-p', '--path', action='append',
-                          help='add path to list of paths to backup, mostly useful for the configuration file')
+                          help="""add path to list of paths to backup,
+mostly useful for the configuration file""")
         # XXX: this should be mandatory, or at least --path or --paths should
         self.add_argument('paths', nargs='*', help='list of paths to backup')
 
@@ -293,7 +306,8 @@ def process(args):
                         lv = vg = None
                 else:
                     # XXX: we could try to find the parent mountpoint...
-                    warn('%s is not a LVM mountpoint, skipping snapshotting' % path)
+                    warn('%s is not a LVM mountpoint, skipping snapshotting'
+                         % path)
             else:
                 warn('%s is not a mountpoint, skipping snapshotting' % path)
 
