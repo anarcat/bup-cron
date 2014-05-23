@@ -315,6 +315,14 @@ class LvmSnapshot(Snapshot):
         vg = self.vg_lv[0]
         lv = self.vg_lv[1]
         m = self.snapmount(self.snapname(lv))
+        # wait for bup to finish
+        try:
+            os.wait()
+        except OSError as e:
+            if e.errno == errno.ECHILD: # no child process
+                pass
+            else:
+                raise
         if os.path.ismount(m):
             if self.call(['umount', m]):
                 self.log('umounted %s' % m)
@@ -471,8 +479,6 @@ def main():
         # get exception type and error, but don't generate the traceback
         t, e = sys.exc_info()[:2]
         warn('aborting with %s exception: %s' % (t.__name__, e))
-        # wait for bup to finish
-        os.wait()
         bail(1)
     finally:
         bail(0)
