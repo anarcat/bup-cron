@@ -44,7 +44,8 @@ at least path and repo need to be specified
         # using the hostname as branch name
         self.add_argument('-n', '--name', default=socket.gethostname(),
                             help='name of the backup passed to bup, defaults to hostname (%s)' % socket.gethostname())
-        self.add_argument('-l', '--log', default=sys.stdout, type=argparse.FileType('w'),
+        self.add_argument('-l', '--log', default=sys.stdout,
+                          type=argparse.FileType(mode='w', bufsize=1),
                             help='file where logs should be written, defaults to stdout')
         self.add_argument('--clear', action='store_true',
                             help='redo a full backup (runs bup index --clear before starting)')
