@@ -436,41 +436,45 @@ def logfmt(msg):
 
 def log(msg, level=1):
     """log message to stdout or logfile, depending on --log"""
-    if args.verbose >= level:
-        args.log.write(logfmt(msg))
+    global __ARGS
+    if __ARGS.verbose >= level:
+        __ARGS.log.write(logfmt(msg))
 
 
 def warn(msg):
     """log a warning to stderr and the logfile"""
     # if log is a file, copy there, otherwise stderr is enough
-    if not args.log.isatty():
+    global __ARGS
+    if not __ARGS.log.isatty():
         log(msg, 0)
     sys.stderr.write(logfmt(msg))
 
 
 def bail(status, msg=None):
     """cleanup on exit"""
-    global start
+    global __START, __ARGS
     if msg:
         warn(msg)
     utimes = 'user %s system %s chlduser %s chldsystem %s' % os.times()[:4]
-    log('finished in %s (%s)' % (str(datetime.datetime.now() - start), utimes))
-    args.log.close()
+    log('finished in %s (%s)'
+        % (str(datetime.datetime.now() - __START), utimes))
+    __ARGS.log.close()
     sys.exit(status)
 
 
 def init():
     """initialise the repo and do other housecleaning"""
-    global start
-    start = datetime.datetime.now()
-    log('backing up %s to %s' % (" ".join(args.paths), os.environ['BUP_DIR']))
+    global __START, __ARGS
+    __START = datetime.datetime.now()
+    log('backing up %s to %s'
+        % (" ".join(__ARGS.paths), os.environ['BUP_DIR']))
     try:
         os.chdir(os.environ['BUP_DIR'])
     except OSError:
         log('bup dir not found, creating')
         check_call_log(['bup', 'init'])
     else:
-        if args.clear:
+        if __ARGS.clear:
             log('clearing log')
             check_call_log(['bup', 'index', '--clear'])
 
@@ -479,13 +483,14 @@ def check_call_log(cmd):
     """call a procss, log it to the logfile
 
 return false if it fails, otherwise true"""
+    global __ARGS
     try:
         log('calling command `%s`' % " ".join(cmd), 2)
-        if args.verbose >= 2:
-            stdout = args.log
+        if __ARGS.verbose >= 2:
+            stdout = __ARGS.log
         else:
             stdout = file(os.devnull)
-        subprocess.check_call(cmd, stdout=stdout, stderr=args.log,
+        subprocess.check_call(cmd, stdout=stdout, stderr=__ARGS.log,
                               close_fds=True)
     except subprocess.CalledProcessError:
         warn('command failed')
@@ -545,12 +550,12 @@ no recovery blocks written""")
 
 def main():
     """main entry point, sets up error handlers and parses arguments"""
-    global args, pidfd
-    args = ArgumentConfigParser().parse_args()
+    global __ARGS
+    __ARGS = ArgumentConfigParser().parse_args()
     init()
     try:
-        with Pidfile(args.pidfile, log, warn):
-            process(args)
+        with Pidfile(__ARGS.pidfile, log, warn):
+            process(__ARGS)
     except:
         #t, e, b = sys.exc_info()
         #warn(traceback.print_tb(b))
