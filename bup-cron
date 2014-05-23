@@ -370,8 +370,9 @@ def process(args):
                 warn('skipping save because index failed!')
                 continue
             log('saving %s' % path)
-            # XXX: should be -q(uiet) unless verbose > 0
             cmd = ['bup', 'save']
+            if args.verbose < 1:
+                cmd += ['-q']
             if args.verbose > 1:
                 cmd += ['-v']
             # XXX: this should just be args.name, but we save once per path so
