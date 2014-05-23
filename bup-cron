@@ -283,17 +283,22 @@ def process(args):
         check_call_log(cmd)
         clean_lv()
 
-# XXX: this should be a "with", but first we need bup index to work properly before refactoring
-args = ArgumentConfigParser().parse_args()
-init()
-try:
-    process(args)
-except:
-    # get exception type and error, but don't generate the traceback
-    t, e = sys.exc_info()[:2]
-    warn('aborting with %s exception: %s' % (t.__name__, e))
-    # wait for bup to finish
-    os.wait()
-finally:
-    bail()
-    sys.exit(0)
+def main():
+    global args
+    # XXX: this should be a "with", but first we need bup index to work properly before refactoring
+    args = ArgumentConfigParser().parse_args()
+    init()
+    try:
+        process(args)
+    except:
+        # get exception type and error, but don't generate the traceback
+        t, e = sys.exc_info()[:2]
+        warn('aborting with %s exception: %s' % (t.__name__, e))
+        # wait for bup to finish
+        os.wait()
+    finally:
+        bail()
+        sys.exit(0)
+
+if __name__ == '__main__':
+    main()
