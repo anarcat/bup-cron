@@ -283,8 +283,8 @@ pattern should have two string wildcards"""
         return '/media/bup/%s' % self.snapname()
 
     def device(self):
-        """path to the device of the LV"""
-        return '/dev/%s/%s' % self.vg_lv
+        """path to the device of the snapshot LV"""
+        return '/dev/%s/%s' % (self.vg_lv[0], self.snapname())
 
     def cleanup(self):
         """cleanup everything we did here"""
