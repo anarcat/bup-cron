@@ -349,7 +349,21 @@ it will also cleanup after itself"""
         return self.create()
 
     def __exit__(self, t, e, tb):
-        return self.remove()
+        """remove the pid file, unless we detected another process"""
+        # return false to raise, true to pass
+        if t is None:
+            # normal condition, no exception
+            self.remove()
+            return True
+        elif t is ProcessRunningException:
+            # do not remove the other process lockfile
+            return False
+        else:
+            # other exception
+            if self.pidfd:
+                # this was our lockfile, removing
+                self.remove()
+            return False
 
     def create(self):
         """initialise pid file"""        
@@ -376,23 +390,6 @@ it will also cleanup after itself"""
         return self
 
     def remove(self):
-        """remove the pid file, unless we detected another process"""
-        # return false to raise, true to pass
-        if t is None:
-            # normal condition, no exception
-            self._remove()
-            return True
-        elif t is ProcessRunningException:
-            # do not remove the other process lockfile
-            return False
-        else:
-            # other exception
-            if self.pidfd:
-                # this was our lockfile, removing
-                self._remove()
-            return False
-
-    def _remove(self):
         """helper function to actually remove the pid file"""
         self.log('removed pidfile %s' % self.pidfile)
         os.remove(self.pidfile)
