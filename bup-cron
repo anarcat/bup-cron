@@ -52,24 +52,28 @@ class ArgumentConfigParser(argparse.ArgumentParser):
     def __init__(self):
         argparse.ArgumentParser.__init__(self,
                                          description=self.description,
-                                         epilog=self.epilog % " or ".join(self.configs),
+                                         epilog=self.epilog %
+                                         " or ".join(self.configs),
                                          fromfile_prefix_chars='@')
         self.add_argument('-v', '--verbose', action='count',
-                         help='output more information on console. tries to be silent if not specified. -v implies explaining what we do, -vv shows output of commands, -vvv passes verbose to those commands')
+                          help='output more information on console. tries to be silent if not specified. -v implies explaining what we do, -vv shows output of commands, -vvv passes verbose to those commands')
         # using the hostname as branch name
         self.add_argument('-n', '--name', default=socket.gethostname(),
-                            help='name of the backup passed to bup, defaults to hostname (%s)' % socket.gethostname())
+                          help='name of the backup passed to bup, defaults to hostname (%s)'
+                          % socket.gethostname())
         self.add_argument('-l', '--logfile', default=sys.stdout, dest='log',
                           type=SaferFileType(mode='a', bufsize=1),
-                            help='file where logs should be written, defaults to stdout')
+                          help='file where logs should be written, defaults to stdout')
         self.add_argument('--pidfile', default=None, action='store',
-                          help='lockfile to write to avoid simultanous execution, defaults to $BUP_DIR/%s' % self.pidfile)
+                          help='lockfile to write to avoid simultanous execution, defaults to $BUP_DIR/%s'
+                          % self.pidfile)
         self.add_argument('--clear', action='store_true',
-                            help='redo a full backup (runs bup index --clear before starting)')
-        self.add_argument('-s', '--snapshot', nargs='?', const='lvm', choices=['lvm'],
-                            help='snapshot filesystem before backup. this will automatically guess the path to the logical volume (if relevant) and create a snapshot, mount it, then remove it when it is done.')
+                          help='redo a full backup (runs bup index --clear before starting)')
+        self.add_argument('-s', '--snapshot', nargs='?',
+                          const='lvm', choices=['lvm'],
+                          help='snapshot filesystem before backup. this will automatically guess the path to the logical volume (if relevant) and create a snapshot, mount it, then remove it when it is done.')
         self.add_argument('-x', '--exclude', action='append',
-                            help='exclude regex pattern, will be passed as --exclude-rx to bup')
+                          help='exclude regex pattern, will be passed as --exclude-rx to bup')
         if 'BUP_DIR' in os.environ:
             defdir = os.environ['BUP_DIR']
         else:
@@ -77,13 +81,14 @@ class ArgumentConfigParser(argparse.ArgumentParser):
         self.add_argument('-r', '--repository',
                           required=('BUP_DIR' not in os.environ),
                           default = defdir,
-                          help='the directory to backup to, defaults to $BUP_DIR (currently %s)' % defdir)
+                          help='the directory to backup to, defaults to $BUP_DIR (currently %s)'
+                          % defdir)
         # different list because dest=paths doesn't work, it gets
         # overwritten by the next one
         # XXX: we'd like to not see this in the usage as well, as it's
         # for the config file
         self.add_argument('-p', '--path', action='append',
-                            help='add path to list of paths to backup, mostly useful for the configuration file')
+                          help='add path to list of paths to backup, mostly useful for the configuration file')
         # XXX: this should be mandatory, or at least --path or --paths should
         self.add_argument('paths', nargs='*', help='list of paths to backup')
 
@@ -165,14 +170,17 @@ def init():
 
 
 def check_call_log(cmd):
-    """call a procss, log it to the logfile and return false if it fails, otherwise true"""
+    """call a procss, log it to the logfile
+
+return false if it fails, otherwise true"""
     try:
         log('calling command `%s`' % " ".join(cmd), 2)
         if args.verbose > 1:
             stdout = args.log
         else:
             stdout = file(os.devnull)
-        subprocess.check_call(cmd, stdout=stdout, stderr=args.log, close_fds=True)
+        subprocess.check_call(cmd, stdout=stdout, stderr=args.log,
+                              close_fds=True)
     except subprocess.CalledProcessError:
         warn('command failed')
         return False
@@ -180,10 +188,14 @@ def check_call_log(cmd):
 
 
 def find_device(path):
-    """find device based on mountpoint path, return the re.match (so None if not found)"""
+    """find device based on mountpoint path
+
+    returns the device or False if none found"""
+
     mounts = subprocess.check_output(['mount'])
     try:
-        return re.match(r".*^(/[^ ]*) on %s .*" % path, mounts, re.MULTILINE | re.DOTALL).group(1)
+        return re.match(r".*^(/[^ ]*) on %s .*" % path, mounts,
+                        re.MULTILINE | re.DOTALL).group(1)
     except:
         return False
 
@@ -228,7 +240,8 @@ def clean_lv():
                 cmd += ['-q']
             if args.verbose > 1:
                 cmd += ['-v']
-            if stat.S_ISBLK(os.stat(device).st_mode) and not check_call_log(cmd):
+            if stat.S_ISBLK(os.stat(device).st_mode) and \
+                    not check_call_log(cmd):
                 warn('failed to drop snapshot %s' % device)
         except OSError:
             # normal: the device doesn't exist, moving on
@@ -240,8 +253,9 @@ def process(args):
     for path in args.paths:
         if args.snapshot:
             vg = lv = None
-            # XXX: all of this should be moved to a Snapshot class, subclassed as LvmSnapshot
-            # it can then be instantiated depending on the value of args.snapshot
+            # XXX: all of this should be moved to a Snapshot class,
+            # subclassed as LvmSnapshot it can then be instantiated
+            # depending on the value of args.snapshot
             if os.path.ismount(path):
                 device = find_device(path)
                 if device:
@@ -249,10 +263,12 @@ def process(args):
                 if device and lvs:
                     vg = lvs[0]
                     lv = lvs[1]
-                    log('umounting and removing previous snapshot %s, if present (errors ignored)' % lvdev(vg, snapname(lv)))
+                    log('umounting and removing previous snapshot %s, if present (errors ignored)'
+                        % lvdev(vg, snapname(lv)))
                     clean_lv()
                     # XXX: snapshot size hardcoded
-                    cmd = ['lvcreate', '--size', '1GB', '--snapshot', '-n', snapname(lv), device]
+                    cmd = ['lvcreate', '--size', '1GB', '--snapshot',
+                           '-n', snapname(lv), device]
                     if args.verbose < 1:
                         cmd += ['-q']
                     if args.verbose > 1:
@@ -261,15 +277,19 @@ def process(args):
                         try:
                             os.chdir(snapmount(snapname(lv)))
                         except OSError:
-                            log('creating missing mountpoint %s' % snapmount(snapname(lv)))
+                            log('creating missing mountpoint %s'
+                                % snapmount(snapname(lv)))
                             os.makedirs(snapmount(snapname(lv)))
-                        if check_call_log(['mount', lvdev(vg, snapname(lv)), snapmount(snapname(lv))]):
+                        if check_call_log(['mount', lvdev(vg, snapname(lv)),
+                                           snapmount(snapname(lv))]):
                             path = snapmount(snapname(lv))
                         else:
-                            warn('failed to mount snapshot %s on %s, skipping snapshotting' % (snapname(lv), snapmount(snapname(lv))))
+                            warn('failed to mount snapshot %s on %s, skipping snapshotting'
+                                 % (snapname(lv), snapmount(snapname(lv))))
                             lv = vg = None
                     else:
-                        warn('failed to create snapshot for LV %s on VG %s, skipping snapshooting' % (lv, vg))
+                        warn('failed to create snapshot for LV %s on VG %s, skipping snapshooting'
+                             % (lv, vg))
                         lv = vg = None
                 else:
                     # XXX: we could try to find the parent mountpoint...
@@ -315,18 +335,21 @@ class Pidfile():
 
     def __enter__(self):
         try:
-            self.pidfd = os.open(self.pidfile, os.O_CREAT | os.O_WRONLY | os.O_EXCL)
+            self.pidfd = os.open(self.pidfile,
+                                 os.O_CREAT | os.O_WRONLY | os.O_EXCL)
             self.log('locked pidfile %s' % self.pidfile)
         except OSError as e:
             if e.errno == errno.EEXIST:
                 pid = self._check()
                 if pid:
                     self.pidfd = None
-                    raise ProcessRunningException('process already running in %s as pid %s' % (self.pidfile, pid))
+                    raise ProcessRunningException('process already running in %s as pid %s'
+                                                  % (self.pidfile, pid))
                 else:
                     os.remove(self.pidfile)
                     self.warn('removed staled lockfile %s' % (self.pidfile))
-                    self.pidfd = os.open(self.pidfile, os.O_CREAT | os.O_WRONLY | os.O_EXCL)
+                    self.pidfd = os.open(self.pidfile,
+                                         os.O_CREAT | os.O_WRONLY | os.O_EXCL)
             else:
                 raise
 
@@ -383,7 +406,8 @@ class ProcessRunningException(BaseException):
 
 def main():
     global args, pidfd
-    # XXX: this should be a "with", but first we need bup index to work properly before refactoring
+    # XXX: this should be a "with", but first we need bup index to
+    # work properly before refactoring
     args = ArgumentConfigParser().parse_args()
     init()
     try:
