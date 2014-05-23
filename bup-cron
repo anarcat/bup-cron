@@ -475,8 +475,7 @@ def main():
         t, e = sys.exc_info()[:2]
         warn('aborting with %s exception: %s' % (t.__name__, e))
         bail(1)
-    finally:
-        bail(0)
+    bail(0)
 
 if __name__ == '__main__':
     main()
