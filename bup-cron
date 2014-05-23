@@ -280,9 +280,9 @@ try:
         cmd = ['bup', 'index']
         if args.verbose > 1:
             cmd += [ '-v' ]
-        cmd += map((lambda ex: '--exclude-rx=' + ex), args.exclude)
-        # XXX: -x hardcoded? -c and -t are apparently useful in case of
-        # disaster
+        if args.exclude:
+            cmd += map((lambda ex: '--exclude-rx=' + ex), args.exclude)
+        # XXX: -x hardcoded?
         cmd += [ '-x', path ]
         if not check_call_log(cmd):
             warn('skipping save because index failed!')
