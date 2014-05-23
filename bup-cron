@@ -509,6 +509,7 @@ def process(args):
     """main processing loop"""
     # current lvm object to cleanup in exception handlers
     for path in args.paths:
+        prelvm_path = path
         with LvmSnapshot(path, args.size,
                          log, warn,
                          args.verbose,
@@ -539,7 +540,7 @@ def process(args):
                 cmd += ['--verbose']
             # XXX: this should just be args.name, but we save once per path so
             # it's cleaner to group by path
-            cmd += ['--strip', '--name', args.name + '-' + path, path]
+            cmd += ['--strip', '--name', args.name + '-' + prelvm_path.replace('/', '_'), path]
             #  -c and -t are apparently useful in case of disaster
             # unfortunately, there are useless if we don't show the output
             if args.verbose >= 2:
