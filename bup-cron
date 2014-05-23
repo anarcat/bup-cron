@@ -167,10 +167,12 @@ class SaferFileType(argparse.FileType):
 
 
 class Snapshot():
-    # default snapshot size
+    """abstract class to handle filesystem snapshots"""
+
+    """default snapshot size"""
     size = '1GB'
 
-    # the location the snapshot is mounted on
+    """default location the snapshot is mounted on"""
     mountpattern = '/media/bup/%s-%s'
 
     def __init__(self, path, size, log=sys.stdout.write, warn=sys.stderr.write,
