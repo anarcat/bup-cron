@@ -550,6 +550,27 @@ class Logger(Singleton):
         return True
 
 
+class GlobalTimer(Singleton):
+    """this class is to track time passed in a program"""
+
+    def __init__(self):
+        """initialize the timstamp"""
+        if not Singleton.__init__(self):
+            self.stamp = datetime.datetime.now()
+
+    def times(self):
+        """return a string designing resource usage"""
+        return 'user %s system %s chlduser %s chldsystem %s' % os.times()[:4]
+
+    def diff(self):
+        """a datediff between the creation of the object and now"""
+        return datetime.datetime.now() - self.stamp
+
+    def __str__(self):
+        """return a string representing the time passed and resources used"""
+        return 'finished in %s (%s)' % (str(self.diff()), self.times())
+
+
 def log(msg, level=1):
     Logger().log(msg, level)
 
@@ -560,21 +581,18 @@ def warn(msg):
 
 def bail(status, msg=None):
     """cleanup on exit"""
-    global __START
     if msg:
         warn(msg)
-    utimes = 'user %s system %s chlduser %s chldsystem %s' % os.times()[:4]
-    log('finished in %s (%s)'
-        % (str(datetime.datetime.now() - __START), utimes))
+    log(str(GlobalTimer()))
     sys.exit(status)
 
 
 def init(args):
     """initialise the repo and do other housecleaning"""
-    global __START
-    __START = datetime.datetime.now()
     # initialize Logger singleton
     Logger(args.verbose, args.log)
+    # init counters
+    GlobalTimer()
     log('backing up %s to %s'
         % (" ".join(args.paths), os.environ['BUP_DIR']))
     try:
