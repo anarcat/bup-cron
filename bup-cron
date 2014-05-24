@@ -70,13 +70,13 @@ tries to be silent if not specified.
                                   simultanous execution, defaults to
                                   $BUP_DIR/%s"""
                           % self.pidfile)
-        self.add_argument('-s', '--snapshot', nargs='?',
-                          const='lvm', choices=['lvm'],
+        self.add_argument('-s', '--snapshot', nargs='?', default='no',
+                          const='lvm', choices=['lvm', 'no'],
                           help="""snapshot filesystem before backup.
                                   this will automatically guess the
                                   path to the logical volume, create a
                                   snapshot, mount it, then remove it
-                                  when it is done.""")
+                                  when it is done, default: %(default)s""")
         self.add_argument('-z', '--size', action='store',
                           default=Snapshot.size,
                           help="""size of the LVM snapshot,
@@ -147,6 +147,9 @@ will be passed as --exclude-rx to bup""")
         del args.repository
         if args.pidfile is None:
             args.pidfile = os.path.join(os.environ['BUP_DIR'], self.pidfile)
+        # turn args.snapshot into the relevant class
+        # sys.modules[__name__] is a hack because the snapshot classes are not in the load path
+        args.snapshot = getattr(sys.modules[__name__], args.snapshot.title() + 'Snapshot')
         return args
 
 
@@ -213,6 +216,13 @@ class Snapshot():
     def cleanup(self):
         """this function should undo all that __enter__() did"""
         pass
+
+
+class NoSnapshot(Snapshot):
+    """special class to skip snapshotting
+
+basically a noop"""
+    pass
 
 
 class LvmSnapshot(Snapshot):
@@ -513,7 +523,7 @@ def process(args):
     # current lvm object to cleanup in exception handlers
     for path in args.paths:
         prelvm_path = path
-        with LvmSnapshot(path, args.size,
+        with args.snapshot(path, args.size,
                          log, warn,
                          args.verbose,
                          check_call_log,
