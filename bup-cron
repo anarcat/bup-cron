@@ -266,10 +266,11 @@ skipping snapshooting"""
                               % self.vg_lv)
             else:
                 # XXX: we could try to find the parent mountpoint...
-                warn('%s is not a LVM mountpoint, skipping snapshotting'
-                     % self.path)
+                self.warn('%s is not a LVM mountpoint, skipping snapshotting'
+                          % self.path)
         else:
-            warn('%s is not a mountpoint, skipping snapshotting' % self.path)
+            self.warn('%s is not a mountpoint, skipping snapshotting'
+                      % self.path)
         return self
 
     def find_device(self):
