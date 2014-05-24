@@ -491,8 +491,11 @@ class Singleton(object):
         return cls._instance
 
     def __init__(self, *args, **kwargs):
+        """return if __init__ was previously ran"""
+        super(Singleton, self).__init__(self, *args, **kwargs)
+        i = self._init
         self._init = True
-        return super(Singleton, self).__init__(self, *args, **kwargs)
+        return i
 
 class Logger(Singleton):
     """singleton logger
@@ -506,11 +509,11 @@ class Logger(Singleton):
     the single avoids the need of global variables."""
 
     def __init__(self, verbose=0, log=sys.stdout, warn=sys.stderr):
-        if not self._init:
+        """initialise the singleton, only if never initialised"""
+        if not Singleton.__init__(self):
             self.verbose = verbose
             self._log = log
             self._warn = warn
-        return Singleton.__init__(self)
 
     @staticmethod
     def logfmt(msg):
