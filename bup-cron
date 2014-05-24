@@ -568,7 +568,7 @@ class GlobalTimer(Singleton):
 
     def __str__(self):
         """return a string representing the time passed and resources used"""
-        return 'finished in %s (%s)' % (str(self.diff()), self.times())
+        return 'elasped: %s (%s)' % (str(self.diff()), self.times())
 
 
 def log(msg, level=1):
