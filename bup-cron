@@ -556,7 +556,7 @@ class GlobalTimer(Singleton):
 
     def __init__(self):
         """initialize the timstamp"""
-        if not Singleton.__init__(self):
+        if not super(Singleton, self).__init__():
             self.stamp = datetime.datetime.now()
 
     def times(self):
