@@ -224,7 +224,7 @@ class Snapshot():
 class NoSnapshot(Snapshot):
     """special class to skip snapshotting
 
-basically a noop"""
+    basically a noop"""
     pass
 
 
