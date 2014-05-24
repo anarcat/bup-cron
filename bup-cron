@@ -582,10 +582,10 @@ def bail(status, msg=None):
 
 def init(args):
     """initialise the repo and do other housecleaning"""
-    # initialize GlobalLogger singleton
-    GlobalLogger(args.verbose, args.log)
     # init counters
     GlobalTimer()
+    # initialize GlobalLogger singleton
+    GlobalLogger(args.verbose, args.log)
     GlobalLogger().log('backing up %s to %s'
                        % (" ".join(args.paths), os.environ['BUP_DIR']))
     try:
