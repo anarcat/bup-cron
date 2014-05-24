@@ -92,10 +92,11 @@ tries to be silent if not specified.
                                   (runs bup index --clear before starting)""")
         self.add_argument('-x', '--exclude', action='append',
                           help="""exclude regex pattern,
-will be passed as --exclude-rx to bup""")
+                                  will be passed as --exclude-rx to bup""")
         self.add_argument('--parity', action='store_true',
                           help="""generate recovery blocks after backup.
-                                  runs bup fsck -g after the backup, requires par2(1).""")
+                                  runs bup fsck -g after the backup,
+                                  requires par2(1).""")
         if 'BUP_DIR' in os.environ:
             defdir = os.environ['BUP_DIR']
         else:
@@ -148,8 +149,12 @@ will be passed as --exclude-rx to bup""")
         if args.pidfile is None:
             args.pidfile = os.path.join(os.environ['BUP_DIR'], self.pidfile)
         # turn args.snapshot into the relevant class
-        # sys.modules[__name__] is a hack because the snapshot classes are not in the load path
-        args.snapshot = getattr(sys.modules[__name__], args.snapshot.title() + 'Snapshot')
+        # sys.modules[__name__] is a hack because the snapshot classes
+        # are not in the load path
+        # XXX: this could be dynamically loaded as well, see
+        # http://stackoverflow.com/questions/547829/how-to-dynamically-load-a-python-class
+        args.snapshot = getattr(sys.modules[__name__], args.snapshot.title()
+                                + 'Snapshot')
         return args
 
 
@@ -524,10 +529,10 @@ def process(args):
     for path in args.paths:
         prelvm_path = path
         with args.snapshot(path, args.size,
-                         log, warn,
-                         args.verbose,
-                         check_call_log,
-                         args.mountpoint) as l:
+                           log, warn,
+                           args.verbose,
+                           check_call_log,
+                           args.mountpoint) as l:
             path = l.path
             # XXX: this shouldn't be in the loop like this, bup index should be
             # able to index multiple paths
@@ -553,7 +558,8 @@ def process(args):
                 cmd += ['--verbose']
             # XXX: this should just be args.name, but we save once per path so
             # it's cleaner to group by path
-            cmd += ['--strip', '--name', args.name + '-' + prelvm_path.replace('/', '_'), path]
+            cmd += ['--strip', '--name', args.name
+                    + '-' + prelvm_path.replace('/', '_'), path]
             #  -c and -t are apparently useful in case of disaster
             # unfortunately, there are useless if we don't show the output
             if args.verbose >= 2:
