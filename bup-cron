@@ -470,30 +470,94 @@ class ProcessRunningException(Exception):
                                   % (path, pid))
 
 
-def logfmt(msg):
-    """helper function to prepend time to messages"""
-    return "%s %s\n" % (time.ctime(), msg)
+class Singleton(object):
+    """singleton implementation
+
+    inspired from:
+
+    http://stackoverflow.com/questions/42558/python-and-the-singleton-pattern"""
+
+    """the single object this will always return"""
+    _instance = None
+
+    """if __init__ was ran"""
+    _init = False
+
+    def __new__(cls, *args, **kwargs):
+        """override constructor to return a single object"""
+        if not cls._instance:
+            cls._instance = super(Singleton, cls).__new__(
+                cls, *args, **kwargs)
+        return cls._instance
+
+    def __init__(self, *args, **kwargs):
+        self._init = True
+        return super(Singleton, self).__init__(self, *args, **kwargs)
+
+class Logger(Singleton):
+    """singleton logger
+
+    this allows logging and warning (to stdout and stderr or a
+    provided file object), with various verbosity levels.
+
+    it also has a convenient executer with support for logging as
+    well.
+
+    the single avoids the need of global variables."""
+
+    def __init__(self, verbose=0, log=sys.stdout, warn=sys.stderr):
+        if not self._init:
+            self.verbose = verbose
+            self._log = log
+            self._warn = warn
+        return Singleton.__init__(self)
+
+    @staticmethod
+    def logfmt(msg):
+        """helper function to prepend time to messages"""
+        return "%s %s\n" % (time.ctime(), msg)
+
+    def log(self, msg, level=1):
+        """log message to stdout or logfile, depending on --log"""
+        if self.verbose >= level:
+            self._log.write(Logger.logfmt(msg))
+
+    def warn(self, msg):
+        """log a warning to stderr and the logfile"""
+        # if log is a file, copy there, otherwise stderr is enough
+        if not self._log.isatty():
+            self.log(msg, 0)
+        self._warn.write(Logger.logfmt(msg))
+
+    def check_call(self, cmd):
+        """call a procss, log it to the logfile
+
+        return false if it fails, otherwise true"""
+        try:
+            log('calling command `%s`' % " ".join(cmd), 2)
+            if self.verbose >= 2:
+                stdout = self._log
+            else:
+                stdout = file(os.devnull)
+            subprocess.check_call(cmd, stdout=stdout, stderr=self._warn,
+                                  close_fds=True)
+        except subprocess.CalledProcessError:
+            self.warn('command failed')
+            return False
+        return True
 
 
 def log(msg, level=1):
-    """log message to stdout or logfile, depending on --log"""
-    global __ARGS
-    if __ARGS.verbose >= level:
-        __ARGS.log.write(logfmt(msg))
+    Logger().log(msg, level)
 
 
 def warn(msg):
-    """log a warning to stderr and the logfile"""
-    # if log is a file, copy there, otherwise stderr is enough
-    global __ARGS
-    if not __ARGS.log.isatty():
-        log(msg, 0)
-    sys.stderr.write(logfmt(msg))
+    Logger().warn(msg)
 
 
 def bail(status, msg=None):
     """cleanup on exit"""
-    global __START, __ARGS
+    global __START
     if msg:
         warn(msg)
     utimes = 'user %s system %s chlduser %s chldsystem %s' % os.times()[:4]
@@ -502,40 +566,24 @@ def bail(status, msg=None):
     sys.exit(status)
 
 
-def init():
+def init(args):
     """initialise the repo and do other housecleaning"""
-    global __START, __ARGS
+    global __START
     __START = datetime.datetime.now()
+    # initialize Logger singleton
+    Logger(args.verbose, args.log)
     log('backing up %s to %s'
-        % (" ".join(__ARGS.paths), os.environ['BUP_DIR']))
+        % (" ".join(args.paths), os.environ['BUP_DIR']))
     try:
         os.chdir(os.environ['BUP_DIR'])
     except OSError:
         log('bup dir not found, creating')
-        check_call_log(['bup', 'init'])
+        Logger().check_call(['bup', 'init'])
     else:
-        if __ARGS.clear:
+        if args.clear:
             log('clearing log')
-            check_call_log(['bup', 'index', '--clear'])
+            Logger().check_call(['bup', 'index', '--clear'])
 
-
-def check_call_log(cmd):
-    """call a procss, log it to the logfile
-
-    return false if it fails, otherwise true"""
-    global __ARGS
-    try:
-        log('calling command `%s`' % " ".join(cmd), 2)
-        if __ARGS.verbose >= 2:
-            stdout = __ARGS.log
-        else:
-            stdout = file(os.devnull)
-        subprocess.check_call(cmd, stdout=stdout, stderr=__ARGS.log,
-                              close_fds=True)
-    except subprocess.CalledProcessError:
-        warn('command failed')
-        return False
-    return True
 
 
 def process(args):
@@ -546,7 +594,7 @@ def process(args):
         with args.snapshot(path, args.size,
                            log, warn,
                            args.verbose,
-                           check_call_log,
+                           Logger().check_call,
                            args.mountpoint) as l:
             path = l.path
             # XXX: this shouldn't be in the loop like this, bup index should be
@@ -562,7 +610,7 @@ def process(args):
             if args.exclude:
                 cmd += map((lambda ex: '--exclude-rx=' + ex), args.exclude)
             cmd += ['--one-file-system', path]
-            if not check_call_log(cmd):
+            if not Logger().check_call(cmd):
                 warn('skipping save because index failed!')
                 continue
             log('saving %s' % path)
@@ -579,14 +627,14 @@ def process(args):
             # unfortunately, there are useless if we don't show the output
             if args.verbose >= 2:
                 cmd += ['--commit', '--tree']
-            check_call_log(cmd)
+            Logger().check_call(cmd)
             if args.parity:
-                if check_call_log(['bup', 'fsck', '--par2-ok']):
+                if Logger().check_call(['bup', 'fsck', '--par2-ok']):
                     cmd = ['bup', 'fsck', '--generate']
                     if args.verbose >= 3:
                         cmd += ['--verbose']
                     log('generating par2(1) recovery blocks')
-                    check_call_log(cmd)
+                    Logger().check_call(cmd)
                 else:
                     warn("""bup reports par2(1) as not working,
 no recovery blocks written""")
@@ -594,20 +642,20 @@ no recovery blocks written""")
 
 def main():
     """main entry point, sets up error handlers and parses arguments"""
-    global __ARGS
-    __ARGS = ArgumentConfigParser().parse_args()
-    init()
+
+    args = ArgumentConfigParser().parse_args()
+    init(args)
     try:
-        with Pidfile(__ARGS.pidfile, log, warn):
-            process(__ARGS)
+        with Pidfile(args.pidfile, log, warn):
+            process(args)
     except:
         # get exception type and error, but don't generate the traceback
-        if __ARGS.debug:
+        if args.debug:
             t, e, b = sys.exc_info()
         else:
             t, e = sys.exc_info()[:2]
         warn('aborting with %s exception: %s' % (t.__name__, e))
-        if __ARGS.debug:
+        if args.debug:
                 warn(traceback.print_tb(b))
         bail(1)
     bail(0)
