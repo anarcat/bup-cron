@@ -402,10 +402,21 @@ class Pidfile():
                     self.pidfd = None
                     raise ProcessRunningException(self.pidfile, pid)
                 else:
-                    os.remove(self.pidfile)
-                    self.warn('removed staled lockfile %s' % (self.pidfile))
-                    self.pidfd = os.open(self.pidfile,
-                                         os.O_CREAT | os.O_WRONLY | os.O_EXCL)
+                    try:
+                        os.remove(self.pidfile)
+                        self.warn('removed staled lockfile %s' % (self.pidfile))
+                        self.pidfd = os.open(self.pidfile,
+                                             os.O_CREAT
+                                             | os.O_WRONLY
+                                             | os.O_EXCL)
+                    except OSError as e:
+                        if e.errno == errno.EACCES:
+                            # we can't write to the file, most likely
+                            # we weren't able to deliver the signal
+                            # because it's running as a different user
+                            # play it safe and abort
+                            with open(self.pidfile, 'r') as f:
+                                raise ProcessRunningException(self.pidfile, f.read())
             else:
                 raise
 
@@ -425,7 +436,11 @@ class Pidfile():
         exist.
 
         if it is still running, returns the pid, if not, return
-        False."""
+        False.
+
+        this assumes we have privileges to send a signal to that
+        process, but if we can't we're likely to be unable to
+        overwrite the pidfile anyways."""
         with open(self.pidfile, 'r') as f:
             try:
                 pidstr = f.read()
