@@ -539,7 +539,7 @@ class Logger(Singleton):
 
         return false if it fails, otherwise true"""
         try:
-            log('calling command `%s`' % " ".join(cmd), 2)
+            self.log('calling command `%s`' % " ".join(cmd), 2)
             if self.verbose >= 2:
                 stdout = self._log
             else:
@@ -573,19 +573,11 @@ class GlobalTimer(Singleton):
         return 'elasped: %s (%s)' % (str(self.diff()), self.times())
 
 
-def log(msg, level=1):
-    Logger().log(msg, level)
-
-
-def warn(msg):
-    Logger().warn(msg)
-
-
 def bail(status, msg=None):
     """cleanup on exit"""
     if msg:
         warn(msg)
-    log(str(GlobalTimer()))
+    Logger().log(str(GlobalTimer()))
     sys.exit(status)
 
 
@@ -595,16 +587,16 @@ def init(args):
     Logger(args.verbose, args.log)
     # init counters
     GlobalTimer()
-    log('backing up %s to %s'
-        % (" ".join(args.paths), os.environ['BUP_DIR']))
+    Logger().log('backing up %s to %s'
+                 % (" ".join(args.paths), os.environ['BUP_DIR']))
     try:
         os.chdir(os.environ['BUP_DIR'])
     except OSError:
-        log('bup dir not found, creating')
+        Logger().log('bup dir not found, creating')
         Logger().check_call(['bup', 'init'])
     else:
         if args.clear:
-            log('clearing log')
+            Logger().log('clearing log')
             Logger().check_call(['bup', 'index', '--clear'])
 
 
@@ -614,16 +606,15 @@ def process(args):
     for path in args.paths:
         prelvm_path = path
         with args.snapshot(path, args.size,
-                           log, warn,
-                           args.verbose,
-                           Logger().check_call,
+                           Logger().log, Logger().warn,
+                           Logger().verbose, Logger().check_call,
                            args.mountpoint) as l:
             path = l.path
             # XXX: this shouldn't be in the loop like this, bup index should be
             # able to index multiple paths
             #
             # unfortunately, `bup index -x / /var` skips /var...
-            log('indexing %s' % path)
+            Logger().log('indexing %s' % path)
             # XXX: should be -q(uiet) unless verbose > 0 - but bup
             # index has no -q
             cmd = ['bup', 'index']
@@ -635,7 +626,7 @@ def process(args):
             if not Logger().check_call(cmd):
                 warn('skipping save because index failed!')
                 continue
-            log('saving %s' % path)
+            Logger().log('saving %s' % path)
             cmd = ['bup', 'save']
             if args.verbose <= 0:
                 cmd += ['--quiet']
@@ -655,7 +646,7 @@ def process(args):
                     cmd = ['bup', 'fsck', '--generate']
                     if args.verbose >= 3:
                         cmd += ['--verbose']
-                    log('generating par2(1) recovery blocks')
+                    Logger().log('generating par2(1) recovery blocks')
                     Logger().check_call(cmd)
                 else:
                     warn("""bup reports par2(1) as not working,
