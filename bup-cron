@@ -572,14 +572,6 @@ class GlobalTimer(Singleton):
         return 'elasped: %s (%s)' % (str(self.diff()), self.times())
 
 
-def bail(status, msg=None):
-    """cleanup on exit"""
-    if msg:
-        GlobalLogger().warn(msg)
-    GlobalLogger().log(str(GlobalTimer()))
-    sys.exit(status)
-
-
 def init(args):
     """initialise the repo and do other housecleaning"""
     # init counters
@@ -597,6 +589,14 @@ def init(args):
         if args.clear:
             GlobalLogger().log('clearing log')
             GlobalLogger().check_call(['bup', 'index', '--clear'])
+
+
+def bail(status, msg=None):
+    """cleanup on exit"""
+    if msg:
+        GlobalLogger().warn(msg)
+    GlobalLogger().log(str(GlobalTimer()))
+    sys.exit(status)
 
 
 def process(args):
