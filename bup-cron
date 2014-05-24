@@ -151,8 +151,6 @@ tries to be silent if not specified.
         # turn args.snapshot into the relevant class
         # sys.modules[__name__] is a hack because the snapshot classes
         # are not in the load path
-        # XXX: this could be dynamically loaded as well, see
-        # http://stackoverflow.com/questions/547829/how-to-dynamically-load-a-python-class
         args.snapshot = getattr(sys.modules[__name__], args.snapshot.title()
                                 + 'Snapshot')
         return args
@@ -404,7 +402,8 @@ class Pidfile():
                 else:
                     try:
                         os.remove(self.pidfile)
-                        self.warn('removed staled lockfile %s' % (self.pidfile))
+                        self.warn('removed staled lockfile %s'
+                                  % (self.pidfile))
                         self.pidfd = os.open(self.pidfile,
                                              os.O_CREAT
                                              | os.O_WRONLY
@@ -416,7 +415,8 @@ class Pidfile():
                             # because it's running as a different user
                             # play it safe and abort
                             with open(self.pidfile, 'r') as f:
-                                raise ProcessRunningException(self.pidfile, f.read())
+                                raise ProcessRunningException(self.pidfile,
+                                                              f.read())
             else:
                 raise
 
@@ -466,7 +466,8 @@ class ProcessRunningException(Exception):
         """override parent constructor to keep path and pid"""
         self.path = path
         self.pid = pid
-        return Exception.__init__(self, 'process already running in %s as pid %s'
+        return Exception.__init__(self,
+                                  'process already running in %s as pid %s'
                                   % (path, pid))
 
 
@@ -475,7 +476,7 @@ class Singleton(object):
 
     inspired from:
 
-    http://stackoverflow.com/questions/42558/python-and-the-singleton-pattern"""
+   http://stackoverflow.com/questions/42558/python-and-the-singleton-pattern"""
 
     """the single object this will always return"""
     _instance = None
@@ -496,6 +497,7 @@ class Singleton(object):
         i = self._init
         self._init = True
         return i
+
 
 class Logger(Singleton):
     """singleton logger
@@ -604,7 +606,6 @@ def init(args):
         if args.clear:
             log('clearing log')
             Logger().check_call(['bup', 'index', '--clear'])
-
 
 
 def process(args):
