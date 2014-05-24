@@ -500,16 +500,14 @@ class Singleton(object):
         return i
 
 
-class Logger(Singleton):
-    """singleton logger
+class GlobalLogger(Singleton):
+    """logger
 
     this allows logging and warning (to stdout and stderr or a
     provided file object), with various verbosity levels.
 
     it also has a convenient executer with support for logging as
-    well.
-
-    the single avoids the need of global variables."""
+    well."""
 
     def __init__(self, verbose=0, log=sys.stdout, warn=sys.stderr):
         """initialise the singleton, only if never initialised"""
@@ -526,14 +524,14 @@ class Logger(Singleton):
     def log(self, msg, level=1):
         """log message to stdout or logfile, depending on --log"""
         if self.verbose >= level:
-            self._log.write(Logger.logfmt(msg))
+            self._log.write(GlobalLogger.logfmt(msg))
 
     def warn(self, msg):
         """log a warning to stderr and the logfile"""
         # if log is a file, copy there, otherwise stderr is enough
         if not self._log.isatty():
             self.log(msg, 0)
-        self._warn.write(Logger.logfmt(msg))
+        self._warn.write(GlobalLogger.logfmt(msg))
 
     def check_call(self, cmd):
         """call a procss, log it to the logfile
@@ -554,7 +552,7 @@ class Logger(Singleton):
 
 
 class GlobalTimer(Singleton):
-    """this class is to track time passed in a program"""
+    """this class is to track time and resources passed"""
 
     def __init__(self):
         """initialize the timstamp"""
@@ -577,28 +575,28 @@ class GlobalTimer(Singleton):
 def bail(status, msg=None):
     """cleanup on exit"""
     if msg:
-        warn(msg)
-    Logger().log(str(GlobalTimer()))
+        GlobalLogger().warn(msg)
+    GlobalLogger().log(str(GlobalTimer()))
     sys.exit(status)
 
 
 def init(args):
     """initialise the repo and do other housecleaning"""
-    # initialize Logger singleton
-    Logger(args.verbose, args.log)
+    # initialize GlobalLogger singleton
+    GlobalLogger(args.verbose, args.log)
     # init counters
     GlobalTimer()
-    Logger().log('backing up %s to %s'
-                 % (" ".join(args.paths), os.environ['BUP_DIR']))
+    GlobalLogger().log('backing up %s to %s'
+                       % (" ".join(args.paths), os.environ['BUP_DIR']))
     try:
         os.chdir(os.environ['BUP_DIR'])
     except OSError:
-        Logger().log('bup dir not found, creating')
-        Logger().check_call(['bup', 'init'])
+        GlobalLogger().log('bup dir not found, creating')
+        GlobalLogger().check_call(['bup', 'init'])
     else:
         if args.clear:
-            Logger().log('clearing log')
-            Logger().check_call(['bup', 'index', '--clear'])
+            GlobalLogger().log('clearing log')
+            GlobalLogger().check_call(['bup', 'index', '--clear'])
 
 
 def process(args):
@@ -607,15 +605,15 @@ def process(args):
     for path in args.paths:
         prelvm_path = path
         with args.snapshot(path, args.size,
-                           Logger().log, Logger().warn,
-                           Logger().verbose, Logger().check_call,
+                           GlobalLogger().log, GlobalLogger().warn,
+                           GlobalLogger().verbose, GlobalLogger().check_call,
                            args.mountpoint) as l:
             path = l.path
             # XXX: this shouldn't be in the loop like this, bup index should be
             # able to index multiple paths
             #
             # unfortunately, `bup index -x / /var` skips /var...
-            Logger().log('indexing %s' % path)
+            GlobalLogger().log('indexing %s' % path)
             # XXX: should be -q(uiet) unless verbose > 0 - but bup
             # index has no -q
             cmd = ['bup', 'index']
@@ -624,10 +622,10 @@ def process(args):
             if args.exclude:
                 cmd += map((lambda ex: '--exclude-rx=' + ex), args.exclude)
             cmd += ['--one-file-system', path]
-            if not Logger().check_call(cmd):
-                warn('skipping save because index failed!')
+            if not GlobalLogger().check_call(cmd):
+                GlobalLogger().warn('skipping save because index failed!')
                 continue
-            Logger().log('saving %s' % path)
+            GlobalLogger().log('saving %s' % path)
             cmd = ['bup', 'save']
             if args.verbose <= 0:
                 cmd += ['--quiet']
@@ -641,16 +639,16 @@ def process(args):
             # unfortunately, there are useless if we don't show the output
             if args.verbose >= 2:
                 cmd += ['--commit', '--tree']
-            Logger().check_call(cmd)
+            GlobalLogger().check_call(cmd)
             if args.parity:
-                if Logger().check_call(['bup', 'fsck', '--par2-ok']):
+                if GlobalLogger().check_call(['bup', 'fsck', '--par2-ok']):
                     cmd = ['bup', 'fsck', '--generate']
                     if args.verbose >= 3:
                         cmd += ['--verbose']
-                    Logger().log('generating par2(1) recovery blocks')
-                    Logger().check_call(cmd)
+                    GlobalLogger().log('generating par2(1) recovery blocks')
+                    GlobalLogger().check_call(cmd)
                 else:
-                    warn("""bup reports par2(1) as not working,
+                    GlobalLogger().warn("""bup reports par2(1) as not working,
 no recovery blocks written""")
 
 
@@ -660,7 +658,7 @@ def main():
     args = ArgumentConfigParser().parse_args()
     init(args)
     try:
-        with Pidfile(args.pidfile, log, warn):
+        with Pidfile(args.pidfile, GlobalLogger().log, GlobalLogger().warn):
             process(args)
     except:
         # get exception type and error, but don't generate the traceback
@@ -668,9 +666,9 @@ def main():
             t, e, b = sys.exc_info()
         else:
             t, e = sys.exc_info()[:2]
-        warn('aborting with %s exception: %s' % (t.__name__, e))
+        GlobalLogger().warn('aborting with %s exception: %s' % (t.__name__, e))
         if args.debug:
-                warn(traceback.print_tb(b))
+                GlobalLogger().warn(traceback.print_tb(b))
         bail(1)
     bail(0)
 
