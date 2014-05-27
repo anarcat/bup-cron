@@ -10,6 +10,10 @@ files.
 limitations
  * assumes POSIX (so no Windows)
  * should be unit tested, at this point it's grown too big
+ * no syslog support, because we would then need to use pipes to talk
+   to bup, which would bring "interesting" results, loose
+   interactivity (unless we use select(), which seems overkill), and
+   complicate everything
  * see XXX below for more
 
 features missing
@@ -507,7 +511,9 @@ class GlobalLogger(Singleton):
     provided file object), with various verbosity levels.
 
     it also has a convenient executer with support for logging as
-    well."""
+    well.
+
+    XXX: this duplicates the builtin logging module."""
 
     def __init__(self, verbose=0, log=sys.stdout, warn=sys.stderr):
         """initialise the singleton, only if never initialised"""
