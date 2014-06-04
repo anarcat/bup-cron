@@ -190,6 +190,9 @@ class Snapshot():
     """default location the snapshot is mounted on"""
     mountpattern = '/media/bup/%s-%s'
 
+    """if the snapshot has been created"""
+    exists = False
+
     def __init__(self, path, size, log=sys.stdout.write, warn=sys.stderr.write,
                  verbose=0, call=subprocess.check_call, mountpattern=None):
         """initialise the snapshot array
@@ -203,6 +206,7 @@ class Snapshot():
         self.warn = warn
         self.verbose = verbose
         self.call = call
+        self.exists = False
         if mountpattern is not None:
             self.mountpattern = mountpattern
 
@@ -244,7 +248,8 @@ class LvmSnapshot(Snapshot):
                 # vg, lv
                 self.vg_lv = LvmSnapshot.find_vg_lv(device)
             if device and self.vg_lv:
-                self.cleanup()
+                # forced cleanup
+                self.cleanup(True)
                 cmd = ['lvcreate', '--size', self.size, '--snapshot',
                        '--name', self.snapname(), device]
                 if self.verbose <= 0:
@@ -258,6 +263,7 @@ class LvmSnapshot(Snapshot):
                         self.log('creating missing mountpoint %s'
                                  % self.mountpoint())
                         os.makedirs(self.mountpoint())
+                    self.exists = True
                     if self.call(['mount', self.device(),
                                   self.mountpoint()]):
                         self.path = self.mountpoint()
@@ -266,6 +272,7 @@ class LvmSnapshot(Snapshot):
 skipping snapshotting"""
                                   % (self.snapname(),
                                      self.mountpoint()))
+                        self.cleanup()
                 else:
                     self.warn("""failed to create snapshot %s/%s,
 skipping snapshooting"""
@@ -317,10 +324,11 @@ skipping snapshooting"""
         """path to the device of the snapshot LV"""
         return '/dev/%s/%s' % (self.vg_lv[0], self.snapname())
 
-    def cleanup(self):
+    def cleanup(self, force=False):
         """cleanup everything we did here"""
-        if not self.vg_lv:
+        if not self.exists and not force:
             return
+        self.exists = False
         m = self.mountpoint()
         # wait for bup to finish
         try:
@@ -639,9 +647,13 @@ def process(args):
                 cmd += ['--quiet']
             if args.verbose >= 3:
                 cmd += ['--verbose']
+            if l.exists:
+                # strip the Snapshot mountpoint
+                # XXX: if there are not snapshot, it would flatten everything
+                cmd += ['--strip']
             # XXX: this should just be args.name, but we save once per path so
             # it's cleaner to group by path
-            cmd += ['--strip', '--name', args.name
+            cmd += ['--name', args.name
                     + '-' + prelvm_path.replace('/', '_'), path]
             #  -c and -t are apparently useful in case of disaster
             # unfortunately, there are useless if we don't show the output
