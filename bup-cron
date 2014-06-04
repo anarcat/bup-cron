@@ -224,6 +224,7 @@ class Snapshot():
     def __exit__(self, t, e, tb):
         # return false to raise, true to pass
         self.cleanup()
+        self.exists = False
         return t is None
 
     def cleanup(self):
@@ -328,7 +329,6 @@ skipping snapshooting"""
         """cleanup everything we did here"""
         if not self.exists and not force:
             return
-        self.exists = False
         m = self.mountpoint()
         # wait for bup to finish
         try:
