@@ -190,9 +190,6 @@ class Snapshot():
     """default location the snapshot is mounted on"""
     mountpattern = '/media/bup/%s-%s'
 
-    """if the snapshot has been created"""
-    exists = False
-
     def __init__(self, path, size, log=sys.stdout.write, warn=sys.stderr.write,
                  verbose=0, call=subprocess.check_call, mountpattern=None):
         """initialise the snapshot array
@@ -206,6 +203,7 @@ class Snapshot():
         self.warn = warn
         self.verbose = verbose
         self.call = call
+        # if the snapshot has been created
         self.exists = False
         if mountpattern is not None:
             self.mountpattern = mountpattern
@@ -329,6 +327,7 @@ skipping snapshooting"""
         """cleanup everything we did here"""
         if not self.exists and not force:
             return
+        self.exists = False
         m = self.mountpoint()
         # wait for bup to finish
         try:
