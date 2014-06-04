@@ -623,8 +623,8 @@ def process(args):
         with args.snapshot(path, args.size,
                            GlobalLogger().log, GlobalLogger().warn,
                            GlobalLogger().verbose, GlobalLogger().check_call,
-                           args.mountpoint) as l:
-            path = l.path
+                           args.mountpoint) as snapshot:
+            path = snapshot.path
             # XXX: this shouldn't be in the loop like this, bup index should be
             # able to index multiple paths
             #
@@ -647,7 +647,7 @@ def process(args):
                 cmd += ['--quiet']
             if args.verbose >= 3:
                 cmd += ['--verbose']
-            if l.exists:
+            if snapshot.exists:
                 # strip the Snapshot mountpoint
                 # XXX: if there are not snapshot, it would flatten everything
                 cmd += ['--strip']
