@@ -317,7 +317,7 @@ skipping snapshooting"""
 
     def cleanup(self):
         """cleanup everything we did here"""
-        if self.vg_lv is None:
+        if not self.vg_lv:
             return
         m = self.mountpoint()
         # wait for bup to finish
