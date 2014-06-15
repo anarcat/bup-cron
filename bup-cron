@@ -278,11 +278,11 @@ skipping snapshooting"""
                               % self.vg_lv)
             else:
                 # XXX: we could try to find the parent mountpoint...
-                self.warn('%s is not a LVM mountpoint, skipping snapshotting'
-                          % self.path)
+                self.log('%s is not a LVM mountpoint, skipping snapshotting'
+                         % self.path)
         else:
-            self.warn('%s is not a mountpoint, skipping snapshotting'
-                      % self.path)
+            self.log('%s is not a mountpoint, skipping snapshotting'
+                     % self.path)
         return self
 
     def find_device(self):
@@ -301,7 +301,7 @@ skipping snapshooting"""
     def find_vg_lv(device):
         """find the volume group and logical volume of the specified device"""
         try:
-            lvs = subprocess.check_output(['lvs', device], close_fds=True)
+            lvs = subprocess.check_output(['lvs', device], close_fds=True, stderr=file(os.devnull))
         except subprocess.CalledProcessError:
             # not a LVM
             return False
