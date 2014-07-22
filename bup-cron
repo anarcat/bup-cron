@@ -62,7 +62,7 @@ tries to be silent if not specified.
 -v implies explaining what we do,
 -vv shows output of commands,
 -vvv passes verbose to those commands""")
-        self.add_argument('-d', '--debug', action='store_true',
+        self.add_argument('-D', '--debug', action='store_true',
                           help="""print debug backtrace on unhandled exceptions
                                   - by default only the message is printed""")
         # using the hostname as branch name
@@ -109,7 +109,7 @@ tries to be silent if not specified.
             defdir = os.environ['BUP_DIR']
         else:
             defdir = None
-        self.add_argument('-r', '--repository',
+        self.add_argument('-d', '--repository',
                           required=('BUP_DIR' not in os.environ),
                           default = defdir,
                           help="""the directory to backup to, defaults
