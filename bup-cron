@@ -196,9 +196,9 @@ class Snapshot():
                  verbose=0, call=subprocess.check_call, mountpattern=None):
         """initialise the snapshot array
 
-        path is expected to be the root of the filesystem log and warn
-        are logging utilities call is a way to call processes that
-        will return true on success or false otherwise"""
+        path is expected to be the root of the filesystem; log and warn are
+        logging utilities; call is a way to call processes that will return
+        true on success or false otherwise"""
         self.path = path
         self.size = size
         self.log = log
