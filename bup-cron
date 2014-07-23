@@ -39,7 +39,7 @@ import traceback
 
 
 class ArgumentConfigParser(argparse.ArgumentParser):
-    configs = ['/etc/bup-cron.conf', '~/.bup-cron.conf']
+    configs = ['/etc/bup-cron.conf', '~/.bup-cron.conf', '~/.config/bup-cron.conf']
     epilog = """options can also be specified, without --, in %s. an
     arbitrary configuration file may also be supplied on the
     commandline with a @ prefix (e.g. @foo.conf).
