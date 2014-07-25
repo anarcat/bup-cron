@@ -199,6 +199,7 @@ class Snapshot():
         path is expected to be the root of the filesystem; log and warn are
         logging utilities; call is a way to call processes that will return
         true on success or false otherwise"""
+        self.src_path = path
         self.path = path
         self.size = size
         self.log = log
@@ -627,7 +628,6 @@ def process(args):
     """main processing loop"""
     # current lvm object to cleanup in exception handlers
     for path in args.paths:
-        prelvm_path = path
         with args.snapshot(path, args.size,
                            GlobalLogger().log, GlobalLogger().warn,
                            GlobalLogger().verbose, GlobalLogger().check_call,
@@ -662,7 +662,7 @@ def process(args):
             # XXX: this should just be args.name, but we save once per path so
             # it's cleaner to group by path
             cmd += ['--name', args.name
-                    + '-' + prelvm_path.replace('/', '_'), path]
+                    + '-' + snapshot.src_path.replace('/', '_'), path]
             #  -c and -t are apparently useful in case of disaster
             # unfortunately, there are useless if we don't show the output
             if args.verbose >= 2:
