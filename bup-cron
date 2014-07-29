@@ -10,7 +10,7 @@ files.
 
 """
 limitations
- * assumes POSIX (so no Windows)
+ * assumes POSIX
  * should be unit tested, at this point it's grown too big
  * no syslog support, because we would then need to use pipes to talk
    to bup, which would bring "interesting" results, loose
@@ -40,6 +40,7 @@ import traceback
 
 class ArgumentConfigParser(argparse.ArgumentParser):
     configs = ['/etc/bup-cron.conf', '~/.bup-cron.conf', '~/.config/bup-cron.conf']
+    snapshot_names = ['lvm', 'no']
     epilog = """options can also be specified, without --, in %s. an
     arbitrary configuration file may also be supplied on the
     commandline with a @ prefix (e.g. @foo.conf).
@@ -50,6 +51,9 @@ class ArgumentConfigParser(argparse.ArgumentParser):
     pidfile = '.bup-cron.pid'
 
     def __init__(self):
+        if sys.platform.startswith('cygwin'):
+            self.snapshot_names += ['vss']
+
         """various settings for the argument parser"""
         argparse.ArgumentParser.__init__(self,
                                          description=self.description,
@@ -79,7 +83,7 @@ tries to be silent if not specified.
                                   $BUP_DIR/%s"""
                           % self.pidfile)
         self.add_argument('-s', '--snapshot', nargs='?', default='no',
-                          const='lvm', choices=['lvm', 'no'],
+                          const='lvm', choices=self.snapshot_names,
                           help="""snapshot filesystem before backup.
                                   this will automatically guess the
                                   path to the logical volume, create a
@@ -368,6 +372,97 @@ skipping snapshooting"""
             return
 
 
+if sys.platform.startswith('cygwin'):
+    class VssSnapshot(Snapshot):
+        """Handle VSS snapshot, under Cygwin"""
+
+        shadow_id = None
+        winpath = None
+
+        def __enter__(self):
+            if ' ' in self.mountpattern:
+                raise ValueError("mountpattern cannot contain a space")
+            device, fs_root = self.find_device()
+            if self.create_snapshot(device):
+                self.mount(fs_root)
+            else:
+                self.warn("""failed to create snapshot for %s, skipping snapshotting""" %
+                          self.path)
+            return self
+
+        def cleanup(self, force=False):
+            if self.shadow_id is not None:
+                device = self._convert2dos(self.src_path)
+                self.log('dropping snapshot on %s' % device)
+                if self.call(['vshadow', '-ds=%s' % self.shadow_id]):
+                    self.shadow_id = None
+                    self.exits = False
+                    self.log('dropped snapshot %s' % device)
+                else:
+                    self.warn('failed to drop snapshot %s' % device)
+            if os.path.exists(self.mountpattern):
+                self._fail_if_mounted()
+                os.rmdir(self.mountpattern)
+                self.log('removed directory %s' % self.mountpattern)
+
+        def _convert_path(self, path, spec):
+            return subprocess.check_output(['cygpath', spec, path]).replace('\n','')
+
+        def _convert2dos(self, linux_path):
+            return self._convert_path(linux_path, '-aw')
+
+        def _convert2linux(self, dos_path):
+            return self._convert_path(dos_path, '-a').rstrip('/')
+
+        def create_snapshot(self, device):
+            self.cleanup(True)
+            try:
+                self.log('creating snapshot on %s' % device)
+                # Note: Windows XP does not supports permanent shadows (-p)
+                output = subprocess.check_output(['vshadow', '-p', device])
+                #* SNAPSHOT ID = {5a698842-f325-404a-83e7-6a7fa08760a1}
+                self.shadow_id = re.search("\* SNAPSHOT ID = (\{[0-9A-Fa-f-]{36}\})", output).group(1)
+                self.log('Shadow copy created: %s' % self.shadow_id)
+                self.exists = True
+                return True
+            except:
+                self.warn('vss snapshot failed, id=%s' % self.shadow_id)
+                return False
+
+        def _fail_if_mounted(self):
+            """throw if the mount point is already used
+
+            The only way to unmount a mounted shadow copy is to erase it, so leave that
+            decision to the user."""
+            output = subprocess.check_output(['vshadow', '-q'])
+            winmount = self._convert2dos(self.mountpattern).replace('\\','\\\\')
+            mounted = re.search("^   - Exposed locally as: (%s)." % winmount,
+                                output, re.MULTILINE | re.IGNORECASE)
+            if mounted is not None:
+                raise AlreadyMountedException(winmount)
+
+        def find_device(self):
+            # XXX: handle devices that are mounted through a directory.
+            self.winpath = self._convert2dos(self.path)
+            device = self.winpath[0:2]
+            return (device, self._convert2linux(device))
+
+        def mount(self, fs_root):
+            """mountpattern must be a path in linux format
+            """
+            if make_dirs_helper(self.mountpattern):
+                self.log('mountpoint %s created' % self.mountpattern)
+            winmount = self._convert2dos(self.mountpattern)
+            if len(winmount) == 3: # if it is a drive letter,
+                winmount = winmount[:-1] # remove the trailing backslash
+            if self.call(['vshadow', "-el=%s,%s" % (self.shadow_id, winmount)]):
+                self.path = self.path.replace(fs_root, self.mountpattern)
+            else:
+                self.warn("""failed to mount snapshot %s on %s, skipping snapshotting""" %
+                          (self.shadow_id, self.mountpattern))
+                self.cleanup(True)
+
+
 class Pidfile():
     """this class is designed to be used with the "with" construct
 
@@ -471,6 +566,19 @@ class Pidfile():
                 return False
             else:
                 return pid
+
+
+class AlreadyMountedException(Exception):
+    def __init__(self, path):
+        """override parent constructor to keep path"""
+        self.path = path
+        return Exception.__init__(self,
+                                  """
+A snapshot is already mounted at that location:
+  %s
+Use "vshadow -q | grep -iB9 '%s'" to identify it and
+use "vshadow -ds={SNAPSHOT_ID}" to unmount it and *erase* it."""
+                                  % (path, path))
 
 
 class ProcessRunningException(Exception):
