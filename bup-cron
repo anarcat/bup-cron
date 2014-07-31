@@ -17,8 +17,6 @@ limitations
    interactivity (unless we use select(), which seems overkill), and
    complicate everything
  * see XXX below for more
- * doesn't support remote hosts, because it assumes bup-index can
-   store files remotely: https://github.com/pfrouleau/bup/commit/5d2b7bfcbc97443d7be2f548453ecc8f8418e02c
 
 features missing
  * --test to run compare-tree after backup
@@ -74,6 +72,8 @@ tries to be silent if not specified.
         self.add_argument('-n', '--name', default=socket.gethostname(),
                           help="""name of the backup passed to bup,
                                   defaults to hostname (%(default)s)""")
+        self.add_argument('-r', '--remote', default=None,
+                          help="""a SSH address to save the backup remotely (example: bup@example.com:repos/repo.bup)""")
         self.add_argument('-l', '--logfile', default=sys.stdout,
                           type=SaferFileType(mode='a', bufsize=1),
                           help="""file where logs should be written,
@@ -750,6 +750,8 @@ def save_data(args, snapshot):
     # it's cleaner to group by path
     cmd += ['--name', args.name
             + '-' + snapshot.src_path.replace('/', '_'), snapshot.path]
+    if args.remote:
+        cmd += ['-r', args.remote]
     #  -t and -c are apparently useful in case of disaster;
     # unfortunately, they are useless if we don't show or log the output
     if args.verbose >= 2:
@@ -758,9 +760,17 @@ def save_data(args, snapshot):
 
 
 def generate_par2(args):
-    if GlobalLogger().check_call(['bup', 'fsck', '--par2-ok']):
-        cmd = ['bup', 'fsck', '--generate']
-        if args.verbose >= 3:
+    base_cmd = ['bup', 'fsck']
+    if args.remote:
+        # XXX: maybe bup-fsck could learn to work on remote repository
+        addr, path = args.remote.split(':')
+        base_cmd = ['ssh', addr, 'bup', '-d', path, 'fsck']
+
+    cmd = base_cmd + ['--par2-ok']
+    if GlobalLogger().check_call(cmd):
+        cmd = base_cmd
+        cmd += ['--generate']
+        if GlobalLogger().verbose >= 3:
             cmd += ['--verbose']
         GlobalLogger().log('generating par2(1) recovery blocks')
         GlobalLogger().check_call(cmd)
