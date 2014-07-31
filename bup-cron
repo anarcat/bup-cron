@@ -689,14 +689,11 @@ def main():
         with Pidfile(args.pidfile):
             process(args)
     except:
-        # get exception type and error, but don't generate the traceback
-        if args.debug:
-            t, e, b = sys.exc_info()
-        else:
-            t, e = sys.exc_info()[:2]
+        # get exception type and error, but print the traceback in debug
+        t, e, b = sys.exc_info()
         GlobalLogger().warn('aborting with %s exception: %s' % (t.__name__, e))
         if args.debug:
-                GlobalLogger().warn(traceback.print_tb(b))
+            GlobalLogger().warn(traceback.print_tb(b))
         bail(1)
     bail(0)
 
