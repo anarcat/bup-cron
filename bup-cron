@@ -373,11 +373,9 @@ class Pidfile():
 
     it will also cleanup after itself"""
 
-    def __init__(self, path, log=sys.stdout.write, warn=sys.stderr.write):
+    def __init__(self, path):
         """setup various parameters"""
         self.pidfile = path
-        self.log = log
-        self.warn = warn
 
     def __enter__(self):
         """wrapper around create() to work with the 'with' statement"""
@@ -405,7 +403,7 @@ class Pidfile():
         try:
             self.pidfd = os.open(self.pidfile,
                                  os.O_CREAT | os.O_WRONLY | os.O_EXCL)
-            self.log('locked pidfile %s' % self.pidfile)
+            GlobalLogger().log('locked pidfile %s' % self.pidfile)
         except OSError as e:
             if e.errno == errno.EEXIST:
                 pid = self._check()
@@ -415,8 +413,8 @@ class Pidfile():
                 else:
                     try:
                         os.remove(self.pidfile)
-                        self.warn('removed staled lockfile %s'
-                                  % (self.pidfile))
+                        GlobalLogger().warn('removed staled lockfile %s'
+                                            % (self.pidfile))
                         self.pidfd = os.open(self.pidfile,
                                              os.O_CREAT
                                              | os.O_WRONLY
@@ -439,7 +437,7 @@ class Pidfile():
 
     def remove(self):
         """helper function to actually remove the pid file"""
-        self.log('removed pidfile %s' % self.pidfile)
+        GlobalLogger().log('removed pidfile %s' % self.pidfile)
         os.remove(self.pidfile)
 
     def _check(self):
@@ -460,12 +458,12 @@ class Pidfile():
                 pid = int(pidstr)
             except ValueError:
                 # not an integer
-                self.log("not an integer: %s" % pidstr)
+                GlobalLogger().log("not an integer: %s" % pidstr)
                 return False
             try:
                 os.kill(pid, 0)
             except OSError:
-                self.log("can't deliver signal to %s" % pid)
+                GlobalLogger().log("can't deliver signal to %s" % pid)
                 return False
             else:
                 return pid
@@ -688,7 +686,7 @@ def main():
     args = ArgumentConfigParser().parse_args()
     init(args)
     try:
-        with Pidfile(args.pidfile, GlobalLogger().log, GlobalLogger().warn):
+        with Pidfile(args.pidfile):
             process(args)
     except:
         # get exception type and error, but don't generate the traceback
