@@ -258,12 +258,9 @@ class LvmSnapshot(Snapshot):
                 if self.verbose >= 3:
                     cmd += ['--verbose']
                 if self.call(cmd):
-                    try:
-                        os.chdir(self.mountpoint())
-                    except OSError:
-                        self.log('creating missing mountpoint %s'
+                    if make_dirs_helper(self.mountpoint()):
+                        self.log('mountpoint %s created'
                                  % self.mountpoint())
-                        os.makedirs(self.mountpoint())
                     self.exists = True
                     if self.call(['mount', self.device(),
                                   self.mountpoint()]):
@@ -589,6 +586,20 @@ class GlobalTimer(Singleton):
         return 'elasped: %s (%s)' % (str(self.diff()), self.times())
 
 
+def make_dirs_helper(path):
+    """Create the directory if it does not exist
+
+    Return True if the directory was created, false if it was already
+    present, throw an OSError exception if it cannot be created"""
+    try:
+        os.makedirs(path)
+        return True
+    except OSError as ex:
+        if ex.errno != errno.EEXIST or not os.path.isdir(path):
+            raise
+        return False
+
+
 def init(args):
     """initialise the repo and do other housecleaning"""
     # init counters
@@ -597,10 +608,8 @@ def init(args):
     GlobalLogger(args.verbose, args.log)
     GlobalLogger().log('backing up %s to %s'
                        % (" ".join(args.paths), os.environ['BUP_DIR']))
-    try:
-        os.chdir(os.environ['BUP_DIR'])
-    except OSError:
-        GlobalLogger().log('bup dir not found, creating')
+    if make_dirs_helper(os.environ['BUP_DIR']):
+        GlobalLogger().log("initiating bup's dir %s" % os.environ['BUP_DIR'])
         GlobalLogger().check_call(['bup', 'init'])
     else:
         if args.clear:
