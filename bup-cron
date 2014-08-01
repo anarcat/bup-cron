@@ -710,6 +710,75 @@ def make_dirs_helper(path):
         return False
 
 
+def update_index(args, path):
+    GlobalLogger().log('indexing %s' % path)
+    # XXX: should be -q(uiet) unless verbose > 0 - but bup
+    # index has no -q
+    cmd = ['bup', 'index']
+    if args.verbose >= 3:
+        cmd += ['--verbose']
+    if args.exclude:
+        cmd += map((lambda ex: '--exclude-rx=' + ex), args.exclude)
+    cmd += ['--one-file-system', path]
+    return GlobalLogger().check_call(cmd)
+
+
+def save_data(args, snapshot):
+    GlobalLogger().log('saving %s' % snapshot.path)
+    cmd = ['bup', 'save']
+    if args.verbose <= 0:
+        cmd += ['--quiet']
+    if args.verbose >= 3:
+        cmd += ['--verbose']
+    if snapshot.exists:
+        # strip the Snapshot mountpoint
+        # XXX: if there are not snapshot, it would flatten everything
+        cmd += ['--strip']
+    # XXX: this should just be args.name, but we save once per path so
+    # it's cleaner to group by path
+    cmd += ['--name', args.name
+            + '-' + snapshot.src_path.replace('/', '_'), snapshot.path]
+    #  -c and -t are apparently useful in case of disaster
+    # unfortunately, there are useless if we don't show the output
+    if args.verbose >= 2:
+        cmd += ['--commit', '--tree']
+    GlobalLogger().check_call(cmd)
+
+
+def generate_par2(args):
+    if GlobalLogger().check_call(['bup', 'fsck', '--par2-ok']):
+        cmd = ['bup', 'fsck', '--generate']
+        if args.verbose >= 3:
+            cmd += ['--verbose']
+        GlobalLogger().log('generating par2(1) recovery blocks')
+        GlobalLogger().check_call(cmd)
+    else:
+        GlobalLogger().warn("""bup reports par2(1) as not working,
+no recovery blocks written""")
+
+
+def process(args):
+    """main processing loop"""
+    # current lvm object to cleanup in exception handlers
+    for path in args.paths:
+        with Snapshot.select(args.snapshot)(path, args.size,
+                             GlobalLogger().log, GlobalLogger().warn,
+                             GlobalLogger().verbose, GlobalLogger().check_call,
+                             args.mountpoint) as snapshot:
+            # XXX: this shouldn't be in the loop like this, bup index should be
+            # able to index multiple paths
+            #
+            # unfortunately, `bup index -x / /var` skips /var...
+            if not update_index(args, snapshot.path):
+                GlobalLogger().warn('skipping save because index failed!')
+                continue
+
+            save_data(args, snapshot)
+
+            if args.parity:
+                generate_par2(args)
+
+
 def init(args):
     """initialise the repo and do other housecleaning"""
     # init counters
@@ -733,62 +802,6 @@ def bail(status, msg=None):
         GlobalLogger().warn(msg)
     GlobalLogger().log(str(GlobalTimer()))
     sys.exit(status)
-
-
-def process(args):
-    """main processing loop"""
-    # current lvm object to cleanup in exception handlers
-    for path in args.paths:
-        with Snapshot.select(args.snapshot)(path, args.size,
-                             GlobalLogger().log, GlobalLogger().warn,
-                             GlobalLogger().verbose, GlobalLogger().check_call,
-                             args.mountpoint) as snapshot:
-            path = snapshot.path
-            # XXX: this shouldn't be in the loop like this, bup index should be
-            # able to index multiple paths
-            #
-            # unfortunately, `bup index -x / /var` skips /var...
-            GlobalLogger().log('indexing %s' % path)
-            # XXX: should be -q(uiet) unless verbose > 0 - but bup
-            # index has no -q
-            cmd = ['bup', 'index']
-            if args.verbose >= 3:
-                cmd += ['--verbose']
-            if args.exclude:
-                cmd += map((lambda ex: '--exclude-rx=' + ex), args.exclude)
-            cmd += ['--one-file-system', path]
-            if not GlobalLogger().check_call(cmd):
-                GlobalLogger().warn('skipping save because index failed!')
-                continue
-            GlobalLogger().log('saving %s' % path)
-            cmd = ['bup', 'save']
-            if args.verbose <= 0:
-                cmd += ['--quiet']
-            if args.verbose >= 3:
-                cmd += ['--verbose']
-            if snapshot.exists:
-                # strip the Snapshot mountpoint
-                # XXX: if there are not snapshot, it would flatten everything
-                cmd += ['--strip']
-            # XXX: this should just be args.name, but we save once per path so
-            # it's cleaner to group by path
-            cmd += ['--name', args.name
-                    + '-' + snapshot.src_path.replace('/', '_'), path]
-            #  -c and -t are apparently useful in case of disaster
-            # unfortunately, there are useless if we don't show the output
-            if args.verbose >= 2:
-                cmd += ['--commit', '--tree']
-            GlobalLogger().check_call(cmd)
-            if args.parity:
-                if GlobalLogger().check_call(['bup', 'fsck', '--par2-ok']):
-                    cmd = ['bup', 'fsck', '--generate']
-                    if args.verbose >= 3:
-                        cmd += ['--verbose']
-                    GlobalLogger().log('generating par2(1) recovery blocks')
-                    GlobalLogger().check_call(cmd)
-                else:
-                    GlobalLogger().warn("""bup reports par2(1) as not working,
-no recovery blocks written""")
 
 
 def main():
