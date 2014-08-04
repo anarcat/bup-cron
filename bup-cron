@@ -25,16 +25,16 @@ features missing
  * support for BTRFS, ZFS, etc
 """
 
-import os
-import sys
-import subprocess
-import socket
 import argparse
-import re
-import stat
-import time
 import datetime
 import errno
+import os
+import re
+import socket
+import stat
+import subprocess
+import sys
+import time
 import traceback
 
 
