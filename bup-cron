@@ -710,86 +710,96 @@ def make_dirs_helper(path):
             raise
         return False
 
+class Bup():
+    """helper to call bup's operations
 
-def update_index(args, path):
-    GlobalLogger().log('indexing %s' % path)
-    # XXX: should be -q(uiet) unless verbose > 0 - but bup
-    # index has no -q
-    cmd = ['bup', 'index']
-    if args.verbose >= 3:
-        cmd += ['--verbose']
-    if args.exclude:
-        cmd += map((lambda ex: '--exclude-rx=' + ex), args.exclude)
-    cmd += ['--one-file-system', path]
-    return GlobalLogger().check_call(cmd)
+    The methods assume that BUP_DIR is set."""
 
-
-def save_data(args, snapshot):
-    GlobalLogger().log('saving %s' % snapshot.path)
-    cmd = ['bup', 'save']
-    if args.verbose <= 0:
-        cmd += ['--quiet']
-    if args.verbose >= 3:
-        cmd += ['--verbose']
-    if snapshot.exists or snapshot.path != '/':
-        # strip the Snapshot mountpoint
-        # XXX: if there are not snapshot, it would flatten everything
-        # this is a bug in bup save - when you have:
-        # src/dir/ src/dir/a/ src/dir/b/
-        # bup save saves it as
-        # dir/ a/ b/
-        # if you --strip-path src/dir/
-        # we would need to --strip-path src/ but that won't work for /
-        # XXX: apparently, all this actually works now, not sure how or why
-        cmd += ['--strip']
-        # we could also strip the path leading to the called directory
-        #cmd += ['--strip-path', snapshot.path.rstrip('/').rpartition('/')[0] ]
-        # see also https://github.com/pfrouleau/bup/commit/4f14b3b2fc8bb4006025b64b9cf8a0839d84f5cb
-
-    # XXX: this should just be args.name, but we save once per path so
-    # it's cleaner to group by path
-    cmd += ['--name', args.name
-            + '-' + snapshot.src_path.replace('/', '_'), snapshot.path]
-    if args.remote:
-        cmd += ['-r', args.remote]
-    #  -t and -c are apparently useful in case of disaster;
-    # unfortunately, they are useless if we don't show or log the output
-    if args.verbose >= 2:
-        cmd += ['--tree', '--commit']
-    GlobalLogger().check_call(cmd)
-
-
-def generate_par2(args):
-    base_cmd = ['bup', 'fsck']
-    if args.remote:
-        # XXX: maybe bup-fsck could learn to work on remote repository
-        addr, path = args.remote.split(':')
-        base_cmd = ['ssh', addr, 'bup', '-d', path, 'fsck']
-
-    cmd = base_cmd + ['--par2-ok']
-    if GlobalLogger().check_call(cmd):
-        cmd = base_cmd
-        cmd += ['--generate']
-        if GlobalLogger().verbose >= 3:
-            cmd += ['--verbose']
-        GlobalLogger().log('generating par2(1) recovery blocks')
+    @staticmethod
+    def init(remote_rep):
+        GlobalLogger().log("initiating bup's dir %s" % quote(os.environ['BUP_DIR']))
+        cmd = ['bup', 'init']
+        if remote_rep:
+            cmd += ['-r', remote_rep]
         GlobalLogger().check_call(cmd)
-    else:
-        GlobalLogger().warn("""bup reports par2(1) as not working,
+
+    @staticmethod
+    def clear_index():
+        GlobalLogger().log('clearing the index')
+        GlobalLogger().check_call(['bup', 'index', '--clear'])
+
+    @staticmethod
+    def generate_par2(remote_rep):
+        base_cmd = ['bup', 'fsck']
+        if remote_rep:
+            # XXX: maybe bup-fsck could learn to work on remote repository
+            addr, path = remote_rep.split(':')
+            base_cmd = ['ssh', addr, 'bup', '-d', path, 'fsck']
+
+        cmd = base_cmd + ['--par2-ok']
+        if GlobalLogger().check_call(cmd):
+            cmd = base_cmd
+            cmd += ['--generate']
+            if GlobalLogger().verbose >= 3:
+                cmd += ['--verbose']
+            GlobalLogger().log('generating par2(1) recovery blocks')
+            GlobalLogger().check_call(cmd)
+        else:
+            GlobalLogger().warn("""bup reports par2(1) as not working,
 no recovery blocks written""")
 
+    @staticmethod
+    def index(path, excludes, excludes_rx, one_file_system):
+        GlobalLogger().log('indexing %s' % quote(path))
+        # XXX: should be -q(uiet) unless verbose > 0 - but bup
+        # index has no -q
+        cmd = ['bup', 'index']
+        if GlobalLogger().verbose >= 4:
+            cmd += ['--verbose']
+        if excludes:
+           cmd += map((lambda ex: '--exclude=' + ex), excludes)
+        if excludes_rx:
+            cmd += map((lambda ex: '--exclude-rx=' + ex), excludes_rx)
+        if one_file_system:
+            cmd += ['--one-file-system']
+        cmd += [path]
+        return GlobalLogger().check_call(cmd)
 
-def init_repo(args):
-    if make_dirs_helper(os.environ['BUP_DIR']):
-        GlobalLogger().log("initiating bup's dir %s" % os.environ['BUP_DIR'])
-        cmd = ['bup', 'init']
-        if args.remote:
-            cmd += ['-r', args.remote]
+    @staticmethod
+    def save(paths, branch, graft, remote_rep):
+        GlobalLogger().log('saving %s' % quotes(paths))
+        cmd = ['bup', 'save']
+        if GlobalLogger().verbose <= 0:
+            cmd += ['--quiet']
+        elif GlobalLogger().verbose >= 3:
+            cmd += ['--verbose']
+        if remote_rep:
+            cmd += ['-r', remote_rep]
+        cmd += ['--name', branch]
+        if '=' in graft:
+            cmd += ['--graft', graft]
+        else:
+            cmd += ['--strip-path', graft]
+        #  -t and -c are apparently useful in case of disaster;
+        # unfortunately, they are useless if we don't show or log the output
+        if GlobalLogger().verbose >= 2:
+            cmd += ['--tree', '--commit']
+        cmd += paths
         GlobalLogger().check_call(cmd)
-    else:
-        if args.clear:
-            GlobalLogger().log('clearing log')
-            GlobalLogger().check_call(['bup', 'index', '--clear'])
+
+
+_quotable=re.compile('\s') # Any white space char (respects UNICODE)
+def quote(str):
+    """Quote str if it contains white spaces"""
+    if _quotable.search(str):
+        return "'" + str + "'"
+    return str
+
+
+def quotes(parts):
+    """Quote the individual strings in parts if it contains white spaces and
+       return them as a single string"""
+    return ' '.join(quote(p) for p in parts)
 
 
 def process(args):
@@ -800,20 +810,26 @@ def process(args):
                              GlobalLogger().log, GlobalLogger().warn,
                              GlobalLogger().verbose, GlobalLogger().check_call,
                              args.mountpoint) as snapshot:
-            init_repo()
+            if make_dirs_helper(os.environ['BUP_DIR']):
+                GlobalLogger().log("initiating bup's dir %s" % os.environ['BUP_DIR'])
+                Bup.init(args.remote)
+            else:
+                if args.clear:
+                    Bup.clear_index()
 
             # XXX: this shouldn't be in the loop like this, bup index should be
             # able to index multiple paths
             #
             # unfortunately, `bup index -x / /var` skips /var...
-            if not update_index(args, snapshot.path):
+            if not Bup.index(snapshot.path, args.exclude, None, True):
                 GlobalLogger().warn('skipping save because index failed!')
                 continue
 
-            save_data(args, snapshot)
+            Bup.save([snapshot.path], args.name + '-' + snapshot.src_path.replace('/', '_'),
+                     snapshot.path, args.remote)
 
             if args.parity:
-                generate_par2(args)
+                Bup.generate_par2(args.remote)
 
 
 def bail(status, timer, msg=None):
