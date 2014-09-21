@@ -21,18 +21,20 @@ limitations
 features missing
  * --test to run compare-tree after backup
  * support for BTRFS, ZFS, etc
- * bup stats as git notes: https://github.com/pfrouleau/bup/commit/69c66b231dc496fb46a14e8101eae910f59403d7
 """
 
 import argparse
 import datetime
 import errno
+import locale
 import os
+import platform
 import re
 import socket
 import stat
 import subprocess
 import sys
+import tempfile
 import time
 import traceback
 
@@ -110,6 +112,8 @@ tries to be silent if not specified.
                           help="""generate recovery blocks after backup.
                                   runs bup fsck -g after the backup,
                                   requires par2(1).""")
+        self.add_argument('--stats', action='store_true',
+                          help="""save statistics about backups as a git note""")
         if 'BUP_DIR' in os.environ:
             defdir = os.environ['BUP_DIR']
         else:
@@ -803,6 +807,101 @@ def make_dirs_helper(path):
         return False
 
 
+du_cmd = ['du', '-bs', '--exclude=*.midx', '--exclude=*.bloom', '--exclude=*.par2']
+
+def set_rep_info_before(info, remote):
+    info['local_bup'] = subprocess.check_output(['bup', '--version']).rstrip('\n')
+    git_output = subprocess.check_output(['git', '--version']).rstrip('\n')
+    info['local_git'] = re.match('git version (.*)', git_output).group(1)
+    info['local_python'] = platform.python_version()
+    if not remote:
+        obj_path = os.path.join(os.environ['BUP_DIR'], 'objects/pack')
+        cmd = du_cmd + [obj_path]
+        info['size_before'] = int(subprocess.check_output(cmd).split('\t')[0])
+    else:
+        server, repo_path = remote.split(':')
+        obj_path = os.path.join(repo_path, 'objects/pack')
+        remote_cmd = ('bup --version || echo "-?bup?-"; '
+                      'git --version | cut -f3 -d" " || echo "-?git?-"; '
+                      'python --version 2>&1 | cut -f2 -d" " || echo "-?python?-"; '
+                      '%s "%s" | cut -f1 || echo "-1"') % (' '.join(du_cmd), obj_path)
+        cmd = ['ssh', '-T', server, remote_cmd]
+        ssh_output = subprocess.check_output(cmd).split('\n')
+        info['remote_bup'] = ssh_output[0]
+        info['remote_git'] = ssh_output[1]
+        info['remote_python'] = ssh_output[2]
+        info['size_before'] = int(ssh_output[3])
+
+
+def set_rep_info_after(info, remote):
+    if not remote:
+        obj_path = os.path.join(os.environ['BUP_DIR'], 'objects/pack')
+        cmd = du_cmd + [obj_path]
+        output = subprocess.check_output(cmd)
+    else:
+        server, repo_path = remote.split(':')
+        obj_path = os.path.join(repo_path, 'objects/pack')
+        remote_cmd = '%s "%s" | cut -f1 || echo "-1"' % (' '.join(du_cmd), obj_path)
+        cmd = ['ssh', '-T', server, remote_cmd]
+        output = subprocess.check_output(cmd)
+    info['size_after'] = int(output.split('\t')[0])
+
+
+def format_num(val):
+    return locale.format("%d", val, grouping=True)
+
+
+def format_note(info, is_local):
+    size_diff = info['size_after'] - info['size_before']
+    txt_sizes = """Repository size:
+  - Before = %15s
+  - After  = %15s
+  - Diff   = %15s""" % (
+    format_num(info['size_before']),
+    format_num(info['size_after']),
+    format_num(size_diff))
+    if is_local:
+        txt_tools = """Tools versions:
+  -    bup: %s
+  -    git: %s
+  - python: %s
+""" % (info['local_bup'], info['local_git'], info['local_python'])
+    else:
+        pad = len(info['local_bup'])
+        txt_tools = """Tools versions:
+  -    bup: local=%s  remote=%s
+  -    git: local=%-*s  remote=%s
+  - python: local=%-*s  remote=%s
+""" % (info['local_bup'], info['remote_bup'],
+       pad, info['local_git'], info['remote_git'],
+       pad, info['local_python'], info['remote_python'])
+    return "%s\n\n%s" % (txt_sizes, txt_tools)
+
+
+def save_stats(info, remote):
+    set_rep_info_after(info, remote)
+    txt_note = format_note(info, remote is None)
+    # We must use a temporary file otherwise the EOL are not written
+    # correctly in the note.
+    if not remote:
+        fd, tmpfile = tempfile.mkstemp(prefix='bup-cron-', suffix='.txt',
+                                       dir=os.environ['BUP_DIR'], text=True)
+        os.write(fd, txt_note)
+        os.close(fd)
+        os.environ['GIT_DIR'] = os.environ['BUP_DIR']
+        cmd = ['git', 'notes', 'add', '-F', tmpfile, info['branch']]
+        subprocess.call(cmd)
+        os.remove(tmpfile)
+    else:
+        os.environ['BUP_CRON_STAT'] = txt_note
+        server, repo_path = remote.split(':')
+        remote_cmd = ('export GIT_DIR="{0}"; '
+                      'echo "{1}" > "$GIT_DIR/bup-cron-{2}.txt"; '
+                      'git notes add -F "$GIT_DIR/bup-cron-{2}.txt" {2}; '
+                      'rm "$GIT_DIR/bup-cron-{2}.txt"'.format(repo_path, txt_note, info['branch']))
+        cmd = ['ssh', '-T', server, remote_cmd]
+        subprocess.call(cmd)
+
 def process(args):
     """main processing loop"""
     # current lvm object to cleanup in exception handlers
@@ -818,6 +917,10 @@ def process(args):
                 if args.clear:
                     Bup.clear_index()
 
+            rep_info = dict()
+            if args.stats:
+                set_rep_info_before(rep_info, args.remote)
+
             # XXX: this shouldn't be in the loop like this, bup index should be
             # able to index multiple paths
             #
@@ -825,9 +928,12 @@ def process(args):
             if not Bup.index(snapshot.path, args.exclude, None, True):
                 GlobalLogger().warn('skipping save because index failed!')
                 continue
-
-            Bup.save([snapshot.path], args.name + '-' + snapshot.src_path.replace('/', '_'),
+            rep_info['branch'] = args.name + '-' + snapshot.src_path.replace('/', '_')
+            Bup.save([snapshot.path], rep_info['branch'],
                      snapshot.path, args.remote)
+
+            if args.stats:
+                save_stats(args.remote, rep_info)
 
             if args.parity:
                 Bup.generate_par2(args.remote)
@@ -844,6 +950,7 @@ def bail(status, timer, msg=None):
 def main():
     """main entry point, sets up error handlers and parses arguments"""
 
+    locale.setlocale(locale.LC_ALL, '')
     args = ArgumentConfigParser().parse_args()
     timer = Timer()
 
