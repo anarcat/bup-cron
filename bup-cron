@@ -18,11 +18,12 @@ limitations
    complicate everything
  * see XXX below for more
  * doesn't support remote hosts, because it assumes bup-index can
-   store files remotely
+   store files remotely: https://github.com/pfrouleau/bup/commit/5d2b7bfcbc97443d7be2f548453ecc8f8418e02c
 
 features missing
  * --test to run compare-tree after backup
  * support for BTRFS, ZFS, etc
+ * bup stats as git notes: https://github.com/pfrouleau/bup/commit/69c66b231dc496fb46a14e8101eae910f59403d7
 """
 
 import argparse
@@ -285,6 +286,7 @@ skipping snapshooting"""
                               % self.vg_lv)
             else:
                 # XXX: we could try to find the parent mountpoint...
+                # see https://github.com/pfrouleau/bup/commit/1244a2da0bf480591b19b9b6123a51ab8662ab56
                 self.warn('%s is not a LVM mountpoint, skipping snapshotting'
                           % self.path)
         else:
@@ -738,9 +740,11 @@ def save_data(args, snapshot):
         # dir/ a/ b/
         # if you --strip-path src/dir/
         # we would need to --strip-path src/ but that won't work for /
+        # XXX: apparently, all this actually works now, not sure how or why
         cmd += ['--strip']
         # we could also strip the path leading to the called directory
         #cmd += ['--strip-path', snapshot.path.rstrip('/').rpartition('/')[0] ]
+        # see also https://github.com/pfrouleau/bup/commit/4f14b3b2fc8bb4006025b64b9cf8a0839d84f5cb
 
     # XXX: this should just be args.name, but we save once per path so
     # it's cleaner to group by path
