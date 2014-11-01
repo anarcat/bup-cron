@@ -751,9 +751,10 @@ class GlobalLogger(Singleton):
                     raise ValueError('Invalid log level: %s' % loglevel)
                 sl.setLevel(loglevel)
                 logging.getLogger('').addHandler(sl)
+                logging.debug('configured syslog level %s' % loglevel)
             # log everything in main logger
             logging.getLogger('').setLevel(logging.DEBUG)
-            if args.logfile == sys.stdout:
+            if args.logfile == sys.stdout or args.logfile == '/dev/stdout':
                 sh = logging.StreamHandler()
                 if args.verbose > 1:
                     sh.setLevel(logging.DEBUG)
@@ -761,13 +762,16 @@ class GlobalLogger(Singleton):
                     sh.setLevel(logging.INFO)
                 else:
                     sh.setLevel(logging.WARNING)
+                self._log = sh.stream
                 logging.getLogger('').addHandler(sh)
+                logging.debug('configured stdout level %s' % sh.level)
             else:
                 # keep 52 weeks of logs
                 fh = logging.handlers.TimedRotatingFileHandler(args.logfile, when='W6', backupCount=52)
                 # serve back the stream to other processes
                 self._log = fh.stream
                 logging.getLogger('').addHandler(fh)
+                logging.debug('configured file output to %s, level %s' % (args.logfile, fh.level))
 
     def check_call(self, cmd):
         """call a procss, log it to the logfile
