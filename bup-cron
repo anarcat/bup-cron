@@ -477,7 +477,7 @@ class Bup():
 
     @staticmethod
     def init(remote_rep):
-        logging.info("initiating bup's dir %s" % quote(os.environ['BUP_DIR']))
+        logging.info("initializing bup's dir %s" % quote(os.environ['BUP_DIR']))
         cmd = ['bup', 'init']
         if remote_rep:
             cmd += ['-r', remote_rep]
@@ -587,7 +587,7 @@ class Pidfile():
         try:
             self.pidfd = os.open(self.pidfile,
                                  os.O_CREAT | os.O_WRONLY | os.O_EXCL)
-            logging.info('locked pidfile %s' % self.pidfile)
+            logging.debug('locked pidfile %s' % self.pidfile)
         except OSError as e:
             if e.errno == errno.EEXIST:
                 pid = self._check()
@@ -621,7 +621,7 @@ class Pidfile():
 
     def remove(self):
         """helper function to actually remove the pid file"""
-        logging.info('removed pidfile %s' % self.pidfile)
+        logging.debug('removed pidfile %s' % self.pidfile)
         os.remove(self.pidfile)
 
     def _check(self):
@@ -642,12 +642,12 @@ class Pidfile():
                 pid = int(pidstr)
             except ValueError:
                 # not an integer
-                logging.info("not an integer: %s" % pidstr)
+                logging.debug("not an integer: %s" % pidstr)
                 return False
             try:
                 os.kill(pid, 0)
             except OSError:
-                logging.info("can't deliver signal to %s" % pid)
+                logging.debug("can't deliver signal to %s" % pid)
                 return False
             else:
                 return pid
@@ -957,7 +957,6 @@ def main():
 
     try:
         if make_dirs_helper(os.environ['BUP_DIR']):
-            logging.info("initiating bup's dir %s" % os.environ['BUP_DIR'])
             Bup.init(args.remote)
         else:
             if args.clear:
