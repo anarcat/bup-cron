@@ -12,7 +12,7 @@ export BUP_DIR="$tmpdir/repo.bup"
 export GIT_DIR="$BUP_DIR"
 
 bup() { "$top/bup" "$@"; }
-bup-cron() { "$top/contrib/bup-cron" --debug --pidfile "$tmpdir/bup-cron.pid" "$@"; }
+bup-cron() { "$top/contrib/bup-cron" --debug -vvv --pidfile "$tmpdir/bup-cron.pid" "$@"; }
 
 WVPASS bup init
 WVPASS cd "$tmpdir"
