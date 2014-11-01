@@ -538,7 +538,7 @@ no recovery blocks written""")
         # XXX: should be -q(uiet) unless verbose > 0 - but bup
         # index has no -q
         cmd = ['bup', 'index']
-        if GlobalLogger().verbose >= 4:
+        if GlobalLogger().verbose >= 3:
             cmd += ['--verbose']
         if excludes:
             cmd += map((lambda ex: '--exclude=' + ex), excludes)
