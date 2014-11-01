@@ -73,7 +73,7 @@ tries to be silent if not specified.
         self.add_argument('-n', '--name', default=socket.gethostname(),
                           help="""name of the backup passed to bup,
                                   defaults to hostname (%(default)s)""")
-        self.add_argument('-l', '--logfile', default=sys.stdout, dest='log',
+        self.add_argument('-l', '--logfile', default=sys.stdout,
                           type=SaferFileType(mode='a', bufsize=1),
                           help="""file where logs should be written,
                                   defaults to stdout""")
@@ -784,7 +784,7 @@ def init(args):
     # init counters
     GlobalTimer()
     # initialize GlobalLogger singleton
-    GlobalLogger(args.verbose, args.log)
+    GlobalLogger(args.verbose, args.logfile)
     GlobalLogger().log('backing up %s to %s'
                        % (" ".join(args.paths), os.environ['BUP_DIR']))
     if make_dirs_helper(os.environ['BUP_DIR']):
