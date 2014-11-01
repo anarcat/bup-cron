@@ -31,17 +31,18 @@ WVPASS date    > "$tmpdir/src/dir2/d21"
 # Basic options
 WVSTART "bup-cron: basic options"
 branch_name="$HOSTNAME-${tmpdir//\//_}_src"
-WVPASS bup-cron "$tmpdir/src/dir1"
+WVPASS bup-cron "$tmpdir/src"
 WVPASSEQ "$(WVPASS bup ls /)" "$branch_name"
-WVPASSEQ "$(WVPASS bup ls /$branch_name/latest/dir1/)" "d10
+WVPASSEQ "$(WVPASS bup ls /$branch_name/latest/dir1)" "d10
 d11"
-WVPASS bup restore -C "$tmpdir/dst/dir1" "$branch_name/latest/"
-WVPASSEQ "$(WVPASS ls "$tmpdir/dst")" "dir1"
-WVPASS "$top/t/compare-trees" "$tmpdir/src/dir1" "$tmpdir/dst/dir1"
+WVPASS bup restore -C "$tmpdir/dst" "$branch_name/latest/"
+WVPASSEQ "$(WVPASS ls "$tmpdir/dst/dir1")" "d10
+d11"
+WVPASS "$top/t/compare-trees" "$tmpdir/src/dir1/" "$tmpdir/dst/dir1/"
 WVPASS rm -fr "$tmpdir/dst"
 
 # test --name and branch isolation
-branch_name="B2-${tmpdir//\//_}_src"
+branch_name="B2-${tmpdir//\//_}_src_dir2"
 WVPASS bup-cron --name B2 "$tmpdir/src/dir2"
 WVPASSEQ "$(WVPASS bup ls /$branch_name/latest/dir2/)" "d20
 d21"

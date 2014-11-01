@@ -733,6 +733,8 @@ def save_data(args, snapshot):
         # strip the Snapshot mountpoint
         # XXX: if there are not snapshot, it would flatten everything
         cmd += ['--strip']
+    else:
+        cmd += ['--strip-path', snapshot.src_path ]
     # XXX: this should just be args.name, but we save once per path so
     # it's cleaner to group by path
     cmd += ['--name', args.name
