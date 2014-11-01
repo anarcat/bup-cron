@@ -895,7 +895,7 @@ def save_stats(info, remote):
         os.close(fd)
         os.environ['GIT_DIR'] = os.environ['BUP_DIR']
         cmd = ['git', 'notes', 'add', '-F', tmpfile, info['branch']]
-        subprocess.call(cmd)
+        GlobalLogger().check_call(cmd)
         os.remove(tmpfile)
     else:
         os.environ['BUP_CRON_STAT'] = txt_note
@@ -905,7 +905,7 @@ def save_stats(info, remote):
                       'git notes add -F "$GIT_DIR/bup-cron-{2}.txt" {2}; '
                       'rm "$GIT_DIR/bup-cron-{2}.txt"'.format(repo_path, txt_note, info['branch']))
         cmd = ['ssh', '-T', server, remote_cmd]
-        subprocess.call(cmd)
+        GlobalLogger().check_call(cmd)
 
 def process(args):
     """main processing loop"""
@@ -931,7 +931,7 @@ def process(args):
                      snapshot.path, args.remote)
 
             if args.stats:
-                save_stats(args.remote, rep_info)
+                save_stats(rep_info, args.remote)
 
             if args.parity:
                 Bup.generate_par2(args.remote)
