@@ -1,12 +1,36 @@
 #! /usr/bin/python
 # -*- coding: utf-8
-"""Copyrights: Antoine Beaupré from http://src.anarc.at/scripts.git/"""
-
 """
 simple wrapper around bup index and save designed to be ran in cron
 jobs, with support for filesystem snapshots, logging and configuration
 files.
-"""
+
+options can also be specified, without --, in %s. an
+arbitrary configuration file may also be supplied on the
+commandline with a @ prefix (e.g. @foo.conf).
+
+at least path and repo need to be specified."""
+
+__copy__ = '''(C) 2013-2014 Antoine Beaupré <anarcat@debian.org>
+This program comes with ABSOLUTELY NO WARRANTY.  This is free
+software, and you are welcome to redistribute it under certain
+conditions; see `--copyright` for details.'''
+
+__copyright__ = '''(C) 2013-2014 Antoine Beaupré <anarcat@debian.org>
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at
+your option) any later version.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+'''
 
 """
 limitations
@@ -40,13 +64,6 @@ import traceback
 class ArgumentConfigParser(argparse.ArgumentParser):
     configs = ['/etc/bup-cron.conf', '~/.bup-cron.conf', '~/.config/bup-cron.conf']
     snapshot_names = ['lvm', 'no']
-    epilog = """options can also be specified, without --, in %s. an
-    arbitrary configuration file may also be supplied on the
-    commandline with a @ prefix (e.g. @foo.conf).
-
-    at least path and repo need to be specified.
-"""
-    description = __doc__
     pidfile = '.bup-cron.pid'
 
     def __init__(self):
@@ -55,82 +72,90 @@ class ArgumentConfigParser(argparse.ArgumentParser):
 
         """various settings for the argument parser"""
         argparse.ArgumentParser.__init__(self,
-                                         description=self.description,
-                                         epilog=self.epilog %
+                                         description=__copy__,
+                                         epilog=__doc__ %
                                          " or ".join(self.configs),
                                          fromfile_prefix_chars='@')
-        self.add_argument('-v', '--verbose', action='count',
-                          help="""output more information on console.
-tries to be silent if not specified.
--v implies explaining what we do,
--vv shows output of commands,
--vvv passes verbose to those commands""")
-        self.add_argument('-D', '--debug', action='store_true',
-                          help="""print debug backtrace on unhandled exceptions
-                                  - by default only the message is printed""")
+        group = self.add_argument_group('Bup configuration options',
+                                        'Those options allow you to configure how bup will behave')
+        group.add_argument('paths', nargs='*', help='list of paths to backup')
+        # different list because dest=paths doesn't work, it gets
+        # overwritten by the next one
+        group.add_argument('-p', '--path', action='append',
+                          help="""add path to list of paths to backup,
+                                  mostly useful for the configuration file""")
+        if 'BUP_DIR' in os.environ:
+            defdir = os.environ['BUP_DIR']
+        else:
+            defdir = None
+        group.add_argument('-d', '--repository',
+                          default = defdir,
+                          help="""the directory to backup to, defaults
+                                  to $BUP_DIR (%s)"""
+                          % defdir)
         # using the hostname as branch name
-        self.add_argument('-n', '--name', default=socket.gethostname(),
+        group.add_argument('-n', '--name', default=socket.gethostname(),
                           help="""name of the backup passed to bup,
                                   defaults to hostname (%(default)s)""")
-        self.add_argument('-r', '--remote', default=None,
+        group.add_argument('-r', '--remote', default=None,
                           help="""a SSH address to save the backup remotely (example: bup@example.com:repos/repo.bup)""")
-        self.add_argument('-l', '--logfile', default=sys.stdout,
-                          help="""file where logs should be written,
-                                  defaults to stdout""")
-        levels = [ i for i in logging._levelNames.keys() if (type(i) == str and i != 'NOTSET') ]
-        self.add_argument('--syslog', nargs='?', default=None, action='store',
-                          const='INFO', choices=levels,
-                          help="""log to syslog facility, default: %(default)s""")
-        self.add_argument('--pidfile', default=None, action='store',
-                          help="""lockfile to write to avoid
-                                  simultanous execution, defaults to
-                                  $BUP_DIR/%s"""
-                          % self.pidfile)
-        self.add_argument('-s', '--snapshot', nargs='?', default='no',
+        group.add_argument('-x', '--exclude', action='append',
+                          help="""exclude regex pattern,
+                                  will be passed as --exclude-rx to bup""")
+        group = self.add_argument_group('Extra jobs', 
+                                        'Those are extra features that bup-cron will run before or after the backup')
+        group.add_argument('--clear', action='store_true',
+                          help="""redo a full backup
+                                  (runs bup index --clear before starting)""")
+        group.add_argument('--parity', action='store_true',
+                          help="""generate recovery blocks after backup.
+                                  runs bup fsck -g after the backup,
+                                  requires par2(1).""")
+        group.add_argument('-s', '--snapshot', nargs='?', default='no',
                           const='lvm', choices=self.snapshot_names,
                           help="""snapshot filesystem before backup.
                                   this will automatically guess the
                                   path to the logical volume, create a
                                   snapshot, mount it, then remove it
                                   when it is done, default: %(default)s""")
-        self.add_argument('-z', '--size', action='store',
+        group.add_argument('-z', '--size', action='store',
                           default=Snapshot.size,
                           help="""size of the LVM snapshot,
                                   defaults to %(default)s""")
-        self.add_argument('-m', '--mountpoint', action='store',
+        group.add_argument('-m', '--mountpoint', action='store',
                           default=Snapshot.mountpattern,
                           help="""mountpoint of the snapshot device.
                                   should contain two %%s patterns, for
                                   the VG and LV names, default:
                                   %(default)s)""")
-        self.add_argument('--clear', action='store_true',
-                          help="""redo a full backup
-                                  (runs bup index --clear before starting)""")
-        self.add_argument('-x', '--exclude', action='append',
-                          help="""exclude regex pattern,
-                                  will be passed as --exclude-rx to bup""")
-        self.add_argument('--parity', action='store_true',
-                          help="""generate recovery blocks after backup.
-                                  runs bup fsck -g after the backup,
-                                  requires par2(1).""")
-        self.add_argument('--stats', action='store_true',
+        group.add_argument('--stats', action='store_true',
                           help="""save statistics about backups as a git note""")
-        if 'BUP_DIR' in os.environ:
-            defdir = os.environ['BUP_DIR']
-        else:
-            defdir = None
-        self.add_argument('-d', '--repository',
-                          required=('BUP_DIR' not in os.environ),
-                          default = defdir,
-                          help="""the directory to backup to, defaults
-                                  to $BUP_DIR (%s)"""
-                          % defdir)
-        # different list because dest=paths doesn't work, it gets
-        # overwritten by the next one
-        self.add_argument('-p', '--path', action='append',
-                          help="""add path to list of paths to backup,
-                                  mostly useful for the configuration file""")
-        self.add_argument('paths', nargs='*', help='list of paths to backup')
+        group = self._optionals
+        group.title = 'Daemon and logging'
+        group.description = '''Those options define how bup-cron itself will behave'''
+        group.add_argument('--copyright', action='store_true',
+                           help='''display copyright notice and exit''')
+        group.add_argument('-v', '--verbose', action='count',
+                          help="""output more information on console.
+tries to be silent if not specified.
+-v implies explaining what we do,
+-vv shows output of commands,
+-vvv passes verbose to those commands""")
+        group.add_argument('-D', '--debug', action='store_true',
+                          help="""print debug backtrace on unhandled exceptions
+                                  - by default only the message is printed""")
+        group.add_argument('-l', '--logfile', default=sys.stdout,
+                          help="""file where logs should be written,
+                                  defaults to stdout""")
+        levels = [ i for i in logging._levelNames.keys() if (type(i) == str and i != 'NOTSET') ]
+        group.add_argument('--syslog', nargs='?', default=None, action='store',
+                          const='INFO', choices=levels,
+                          help="""log to syslog facility, default: %(default)s""")
+        group.add_argument('--pidfile', default=None, action='store',
+                          help="""lockfile to write to avoid
+                                  simultanous execution, defaults to
+                                  $BUP_DIR/%s"""
+                          % self.pidfile)
 
     def convert_arg_line_to_args(self, arg_line):
         """parse a config file"""
@@ -154,6 +179,11 @@ tries to be silent if not specified.
             except IOError:
                 pass
         args = argparse.ArgumentParser.parse_args(self)
+        if args.copyright:
+            self.exit(0, __copyright__)
+        if 'BUP_DIR' not in os.environ and not args.repository:
+            self.error('argument -d/--repository is required')
+
         # merge the path and paths arguments
         if args.path:
             args.paths += args.path
