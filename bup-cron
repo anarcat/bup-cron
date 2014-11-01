@@ -729,12 +729,19 @@ def save_data(args, snapshot):
         cmd += ['--quiet']
     if args.verbose >= 3:
         cmd += ['--verbose']
-    if snapshot.exists:
+    if snapshot.exists or snapshot.path != '/':
         # strip the Snapshot mountpoint
         # XXX: if there are not snapshot, it would flatten everything
+        # this is a bug in bup save - when you have:
+        # src/dir/ src/dir/a/ src/dir/b/
+        # bup save saves it as
+        # dir/ a/ b/
+        # if you --strip-path src/dir/
+        # we would need to --strip-path src/ but that won't work for /
         cmd += ['--strip']
-    else:
-        cmd += ['--strip-path', snapshot.src_path ]
+        # we could also strip the path leading to the called directory
+        #cmd += ['--strip-path', snapshot.path.rstrip('/').rpartition('/')[0] ]
+
     # XXX: this should just be args.name, but we save once per path so
     # it's cleaner to group by path
     cmd += ['--name', args.name
