@@ -779,6 +779,19 @@ def generate_par2(args):
 no recovery blocks written""")
 
 
+def init_repo(args):
+    if make_dirs_helper(os.environ['BUP_DIR']):
+        GlobalLogger().log("initiating bup's dir %s" % os.environ['BUP_DIR'])
+        cmd = ['bup', 'init']
+        if args.remote:
+            cmd += ['-r', args.remote]
+        GlobalLogger().check_call(cmd)
+    else:
+        if args.clear:
+            GlobalLogger().log('clearing log')
+            GlobalLogger().check_call(['bup', 'index', '--clear'])
+
+
 def process(args):
     """main processing loop"""
     # current lvm object to cleanup in exception handlers
@@ -787,6 +800,8 @@ def process(args):
                              GlobalLogger().log, GlobalLogger().warn,
                              GlobalLogger().verbose, GlobalLogger().check_call,
                              args.mountpoint) as snapshot:
+            init_repo()
+
             # XXX: this shouldn't be in the loop like this, bup index should be
             # able to index multiple paths
             #
