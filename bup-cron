@@ -11,11 +11,7 @@ files.
 """
 limitations
  * assumes POSIX
- * should be unit tested, at this point it's grown too big
- * no syslog support, because we would then need to use pipes to talk
-   to bup, which would bring "interesting" results, loose
-   interactivity (unless we use select(), which seems overkill), and
-   complicate everything
+ * tests are incomplete
  * see XXX below for more
 
 features missing
@@ -27,6 +23,7 @@ import argparse
 import datetime
 import errno
 import locale
+import logging
 import os
 import platform
 import re
@@ -80,6 +77,10 @@ tries to be silent if not specified.
                           type=SaferFileType(mode='a', bufsize=1),
                           help="""file where logs should be written,
                                   defaults to stdout""")
+        levels = [ i for i in logging._levelNames.keys() if (type(i) == str and i != 'NOTSET') ]
+        self.add_argument('--syslog', nargs='?', default=None, action='store',
+                          const='INFO', choices=levels,
+                          help="""log to syslog facility, default: %(default)s""")
         self.add_argument('--pidfile', default=None, action='store',
                           help="""lockfile to write to avoid
                                   simultanous execution, defaults to
@@ -272,29 +273,29 @@ class LvmSnapshot(Snapshot):
                     cmd += ['--verbose']
                 if self.call(cmd):
                     if make_dirs_helper(self.mountpoint()):
-                        self.log('mountpoint %s created'
-                                 % self.mountpoint())
+                        logging.info('mountpoint %s created'
+                                     % self.mountpoint())
                     self.exists = True
                     if self.call(['mount', self.device(),
                                   self.mountpoint()]):
                         self.path = self.mountpoint()
                     else:
-                        self.warn("""failed to mount snapshot %s on %s,
+                        logging.warn("""failed to mount snapshot %s on %s,
 skipping snapshotting"""
                                   % (self.snapname(),
                                      self.mountpoint()))
                         self.cleanup()
                 else:
-                    self.warn("""failed to create snapshot %s/%s,
+                    logging.warn("""failed to create snapshot %s/%s,
 skipping snapshooting"""
                               % self.vg_lv)
             else:
                 # XXX: we could try to find the parent mountpoint...
                 # see https://github.com/pfrouleau/bup/commit/1244a2da0bf480591b19b9b6123a51ab8662ab56
-                self.warn('%s is not a LVM mountpoint, skipping snapshotting'
+                logging.warn('%s is not a LVM mountpoint, skipping snapshotting'
                           % self.path)
         else:
-            self.warn('%s is not a mountpoint, skipping snapshotting'
+            logging.warn('%s is not a mountpoint, skipping snapshotting'
                       % self.path)
         return self
 
@@ -352,12 +353,12 @@ skipping snapshooting"""
                 raise
         if os.path.ismount(m):
             if self.call(['umount', m]):
-                self.log('umounted %s' % m)
+                logging.info('umounted %s' % m)
             else:
-                self.warn('failed to umount %s' % m)
+                logging.warn('failed to umount %s' % m)
         try:
             os.removedirs(m)
-            self.log('removed directory %s' % m)
+            logging.info('removed directory %s' % m)
         except:
             pass
         device = self.device()
@@ -370,9 +371,9 @@ skipping snapshooting"""
                 cmd += ['--verbose']
             if stat.S_ISBLK(os.stat(device).st_mode):
                 if self.call(cmd):
-                    self.log('dropped snapshot %s' % device)
+                    logging.info('dropped snapshot %s' % device)
                 else:
-                    self.warn('failed to drop snapshot %s' % device)
+                    logging.warn('failed to drop snapshot %s' % device)
         except OSError:
             # normal: the device doesn't exist, moving on
             return
@@ -392,24 +393,24 @@ if sys.platform.startswith('cygwin'):
             if self.create_snapshot(device):
                 self.mount(fs_root)
             else:
-                self.warn("""failed to create snapshot for %s, skipping snapshotting""" %
+                logging.warn("""failed to create snapshot for %s, skipping snapshotting""" %
                           self.path)
             return self
 
         def cleanup(self, force=False):
             if self.shadow_id is not None:
                 device = self._convert2dos(self.src_path)
-                self.log('dropping snapshot on %s' % device)
+                logging.info('dropping snapshot on %s' % device)
                 if self.call(['vshadow', '-ds=%s' % self.shadow_id]):
                     self.shadow_id = None
                     self.exits = False
-                    self.log('dropped snapshot %s' % device)
+                    logging.info('dropped snapshot %s' % device)
                 else:
-                    self.warn('failed to drop snapshot %s' % device)
+                    logging.warn('failed to drop snapshot %s' % device)
             if os.path.exists(self.mountpattern):
                 self._fail_if_mounted()
                 os.rmdir(self.mountpattern)
-                self.log('removed directory %s' % self.mountpattern)
+                logging.info('removed directory %s' % self.mountpattern)
 
         def _convert_path(self, path, spec):
             return subprocess.check_output(['cygpath', spec, path]).replace('\n','')
@@ -423,16 +424,16 @@ if sys.platform.startswith('cygwin'):
         def create_snapshot(self, device):
             self.cleanup(True)
             try:
-                self.log('creating snapshot on %s' % device)
+                logging.info('creating snapshot on %s' % device)
                 # Note: Windows XP does not supports permanent shadows (-p)
                 output = subprocess.check_output(['vshadow', '-p', device])
                 #* SNAPSHOT ID = {5a698842-f325-404a-83e7-6a7fa08760a1}
                 self.shadow_id = re.search("\* SNAPSHOT ID = (\{[0-9A-Fa-f-]{36}\})", output).group(1)
-                self.log('Shadow copy created: %s' % self.shadow_id)
+                logging.info('Shadow copy created: %s' % self.shadow_id)
                 self.exists = True
                 return True
             except:
-                self.warn('vss snapshot failed, id=%s' % self.shadow_id)
+                logging.warn('vss snapshot failed, id=%s' % self.shadow_id)
                 return False
 
         def _fail_if_mounted(self):
@@ -457,14 +458,14 @@ if sys.platform.startswith('cygwin'):
             """mountpattern must be a path in linux format
             """
             if make_dirs_helper(self.mountpattern):
-                self.log('mountpoint %s created' % self.mountpattern)
+                logging.info('mountpoint %s created' % self.mountpattern)
             winmount = self._convert2dos(self.mountpattern)
             if len(winmount) == 3: # if it is a drive letter,
                 winmount = winmount[:-1] # remove the trailing backslash
             if self.call(['vshadow', "-el=%s,%s" % (self.shadow_id, winmount)]):
                 self.path = self.path.replace(fs_root, self.mountpattern)
             else:
-                self.warn("""failed to mount snapshot %s on %s, skipping snapshotting""" %
+                logging.warn("""failed to mount snapshot %s on %s, skipping snapshotting""" %
                           (self.shadow_id, self.mountpattern))
                 self.cleanup(True)
 
@@ -476,7 +477,7 @@ class Bup():
 
     @staticmethod
     def init(remote_rep):
-        GlobalLogger().log("initiating bup's dir %s" % quote(os.environ['BUP_DIR']))
+        logging.info("initiating bup's dir %s" % quote(os.environ['BUP_DIR']))
         cmd = ['bup', 'init']
         if remote_rep:
             cmd += ['-r', remote_rep]
@@ -484,7 +485,7 @@ class Bup():
 
     @staticmethod
     def clear_index():
-        GlobalLogger().log('clearing the index')
+        logging.info('clearing the index')
         GlobalLogger().check_call(['bup', 'index', '--clear'])
 
     @staticmethod
@@ -501,15 +502,15 @@ class Bup():
             cmd += ['--generate']
             if GlobalLogger().verbose >= 3:
                 cmd += ['--verbose']
-            GlobalLogger().log('generating par2(1) recovery blocks')
+            logging.info('generating par2(1) recovery blocks')
             GlobalLogger().check_call(cmd)
         else:
-            GlobalLogger().warn("""bup reports par2(1) as not working,
+            logging.warn("""bup reports par2(1) as not working,
 no recovery blocks written""")
 
     @staticmethod
     def index(path, excludes, excludes_rx, one_file_system):
-        GlobalLogger().log('indexing %s' % quote(path))
+        logging.info('indexing %s' % quote(path))
         # XXX: should be -q(uiet) unless verbose > 0 - but bup
         # index has no -q
         cmd = ['bup', 'index']
@@ -526,7 +527,7 @@ no recovery blocks written""")
 
     @staticmethod
     def save(paths, branch, graft, remote_rep):
-        GlobalLogger().log('saving %s' % quotes(paths))
+        logging.info('saving %s' % quotes(paths))
         cmd = ['bup', 'save']
         if GlobalLogger().verbose <= 0:
             cmd += ['--quiet']
@@ -586,7 +587,7 @@ class Pidfile():
         try:
             self.pidfd = os.open(self.pidfile,
                                  os.O_CREAT | os.O_WRONLY | os.O_EXCL)
-            GlobalLogger().log('locked pidfile %s' % self.pidfile)
+            logging.info('locked pidfile %s' % self.pidfile)
         except OSError as e:
             if e.errno == errno.EEXIST:
                 pid = self._check()
@@ -596,7 +597,7 @@ class Pidfile():
                 else:
                     try:
                         os.remove(self.pidfile)
-                        GlobalLogger().warn('removed staled lockfile %s'
+                        logging.warn('removed staled lockfile %s'
                                             % (self.pidfile))
                         self.pidfd = os.open(self.pidfile,
                                              os.O_CREAT
@@ -620,7 +621,7 @@ class Pidfile():
 
     def remove(self):
         """helper function to actually remove the pid file"""
-        GlobalLogger().log('removed pidfile %s' % self.pidfile)
+        logging.info('removed pidfile %s' % self.pidfile)
         os.remove(self.pidfile)
 
     def _check(self):
@@ -641,12 +642,12 @@ class Pidfile():
                 pid = int(pidstr)
             except ValueError:
                 # not an integer
-                GlobalLogger().log("not an integer: %s" % pidstr)
+                logging.info("not an integer: %s" % pidstr)
                 return False
             try:
                 os.kill(pid, 0)
             except OSError:
-                GlobalLogger().log("can't deliver signal to %s" % pid)
+                logging.info("can't deliver signal to %s" % pid)
                 return False
             else:
                 return pid
@@ -708,7 +709,7 @@ class Singleton(object):
 
 class GlobalLogger(Singleton):
     """logger
-
+l
     this allows logging and warning (to stdout and stderr or a
     provided file object), with various verbosity levels.
 
@@ -717,36 +718,41 @@ class GlobalLogger(Singleton):
 
     XXX: this duplicates the builtin logging module."""
 
-    def __init__(self, verbose=0, log=sys.stdout, warn=sys.stderr):
+    def __init__(self, args=None):
         """initialise the singleton, only if never initialised"""
         if not Singleton.__init__(self):
-            self.verbose = verbose
-            self._log = log
-            self._warn = warn
+            self.verbose = args.verbose
+            self._log = args.logfile
+            self._warn = sys.stderr
 
-    @staticmethod
-    def logfmt(msg):
-        """helper function to prepend time to messages"""
-        return "%s %s\n" % (time.ctime(), msg)
+            # setup python logging facilities
+            if args.syslog:
+                sl = logging.handlers.SysLogHandler(address='/dev/log')
+                sl.setFormatter(logging.Formatter('%(filename)s[%(process)d]: %(message)s'))
+                # convert syslog argument to a numeric value
+                numeric_level = getattr(logging, args.syslog.upper(), None)
+                if not isinstance(numeric_level, int):
+                    raise ValueError('Invalid log level: %s' % loglevel)
+                sl.setLevel(numeric_level)
+                logging.getLogger('').addHandler(sl)
+            # log everything in main logger
+            logging.getLogger('').setLevel(logging.DEBUG)
+            sh = logging.StreamHandler()
+            if args.verbose > 1:
+                sh.setLevel(logging.DEBUG)
+            elif args.verbose > 0:
+                sh.setLevel(logging.INFO)
+            else:
+                sh.setLevel(logging.WARNING)
+            logging.getLogger('').addHandler(sh)
 
-    def log(self, msg, level=1):
-        """log message to stdout or logfile, depending on --log"""
-        if self.verbose >= level:
-            self._log.write(GlobalLogger.logfmt(msg))
-
-    def warn(self, msg):
-        """log a warning to stderr and the logfile"""
-        # if log is a file, copy there, otherwise stderr is enough
-        if not self._log.isatty():
-            self.log(msg, 0)
-        self._warn.write(GlobalLogger.logfmt(msg))
 
     def check_call(self, cmd):
         """call a procss, log it to the logfile
 
         return false if it fails, otherwise true"""
         try:
-            self.log('calling command `%s`' % " ".join(cmd), 2)
+            logging.debug('calling command `%s`' % " ".join(cmd))
             if self.verbose >= 2:
                 stdout = self._log
             else:
@@ -754,7 +760,7 @@ class GlobalLogger(Singleton):
             subprocess.check_call(cmd, stdout=stdout, stderr=self._warn,
                                   close_fds=True)
         except subprocess.CalledProcessError:
-            self.warn('command failed')
+            logging.warn('command failed')
             return False
         return True
 
@@ -907,11 +913,11 @@ def process(args):
     # current lvm object to cleanup in exception handlers
     for path in args.paths:
         with Snapshot.select(args.snapshot)(path, args.size,
-                             GlobalLogger().log, GlobalLogger().warn,
+                             logging.info, logging.warn,
                              GlobalLogger().verbose, GlobalLogger().check_call,
                              args.mountpoint) as snapshot:
             if make_dirs_helper(os.environ['BUP_DIR']):
-                GlobalLogger().log("initiating bup's dir %s" % os.environ['BUP_DIR'])
+                logging.info("initiating bup's dir %s" % os.environ['BUP_DIR'])
                 Bup.init(args.remote)
             else:
                 if args.clear:
@@ -926,7 +932,7 @@ def process(args):
             #
             # unfortunately, `bup index -x / /var` skips /var...
             if not Bup.index(snapshot.path, args.exclude, None, True):
-                GlobalLogger().warn('skipping save because index failed!')
+                logging.warn('skipping save because index failed!')
                 continue
             rep_info['branch'] = args.name + '-' + snapshot.src_path.replace('/', '_')
             Bup.save([snapshot.path], rep_info['branch'],
@@ -942,8 +948,8 @@ def process(args):
 def bail(status, timer, msg=None):
     """cleanup on exit"""
     if msg:
-        GlobalLogger().warn(msg)
-    GlobalLogger().log(str(timer))
+        logging.warn(msg)
+    logging.info(str(timer))
     sys.exit(status)
 
 
@@ -955,7 +961,7 @@ def main():
     timer = Timer()
 
     # initialize GlobalLogger singleton
-    GlobalLogger(args.verbose, args.logfile)
+    GlobalLogger(args)
 
     try:
         with Pidfile(args.pidfile):
@@ -963,9 +969,9 @@ def main():
     except:
         # get exception type and error, but print the traceback in debug
         t, e, b = sys.exc_info()
-        GlobalLogger().warn('aborting with %s exception: %s' % (t.__name__, e))
+        logging.warn('aborting with %s exception: %s' % (t.__name__, e))
         if args.debug:
-            GlobalLogger().warn(traceback.print_tb(b))
+            logging.warn(traceback.print_tb(b))
         bail(1, timer)
     bail(0, timer)
 
