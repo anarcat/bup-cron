@@ -113,6 +113,7 @@ class ArgumentConfigParser(argparse.ArgumentParser):
                                   requires par2(1).""")
         group.add_argument('-s', '--snapshot', nargs='?', default='no',
                           const='lvm', choices=self.snapshot_names,
+                           type=str.upper,
                           help="""snapshot filesystem before backup.
                                   this will automatically guess the
                                   path to the logical volume, create a
@@ -148,7 +149,8 @@ tries to be silent if not specified.
                           help="""file where logs should be written,
                                   defaults to stdout""")
         levels = [ i for i in logging._levelNames.keys() if (type(i) == str and i != 'NOTSET') ]
-        group.add_argument('--syslog', nargs='?', default=None, action='store',
+        group.add_argument('--syslog', nargs='?', default=None,
+                           type=str.upper, action='store',
                           const='INFO', choices=levels,
                           help="""log to syslog facility, default: %(default)s""")
         group.add_argument('--pidfile', default=None, action='store',
