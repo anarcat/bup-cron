@@ -169,25 +169,6 @@ tries to be silent if not specified.
         return args
 
 
-class SaferFileType(argparse.FileType):
-    """Factory for creating file object types
-
-    This replacement is necessary for two reasons:
-
-    * '-' and mode='a' conflict
-    * crashes if logfile cannot be opened, which breaks usage
-    """
-    def __call__(self, string):
-        """override parent to get the behavior we want"""
-        if string == '-' and 'a' in self._mode:
-            self._mode = self._mode.replace('a', 'w')
-        try:
-            return argparse.FileType.__call__(self, string)
-        except argparse.ArgumentTypeError as e:
-            sys.stderr.write(str(e) + "\n")
-            return sys.stdout
-
-
 class Snapshot(object):
     """abstract class to handle filesystem snapshots"""
 
