@@ -17,8 +17,8 @@ bup-cron() { "$top/contrib/bup-cron" --pidfile "$tmpdir/bup-cron.pid" "$@"; }
 WVPASS bup init
 WVPASS cd "$tmpdir"
 
-# Does bup-cron can be called
-WVPASS bup-cron -h
+# Can bup-cron be called
+WVPASS bup-cron -h >/dev/null
 
 # Create some data to backup
 WVSTART "create src data"
