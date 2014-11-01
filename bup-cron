@@ -57,12 +57,13 @@ import stat
 import subprocess
 import sys
 import tempfile
-import time
 import traceback
 
 
 class ArgumentConfigParser(argparse.ArgumentParser):
-    configs = ['/etc/bup-cron.conf', '~/.bup-cron.conf', '~/.config/bup-cron.conf']
+    configs = ['/etc/bup-cron.conf',
+               '~/.bup-cron.conf',
+               '~/.config/bup-cron.conf']
     snapshot_names = ['lvm', 'no']
     pidfile = '.bup-cron.pid'
 
@@ -77,87 +78,95 @@ class ArgumentConfigParser(argparse.ArgumentParser):
                                          " or ".join(self.configs),
                                          fromfile_prefix_chars='@')
         group = self.add_argument_group('Bup configuration options',
-                                        'Those options allow you to configure how bup will behave')
+                                        '''Those options allow you to
+                                        configure how bup will behave''')
         group.add_argument('paths', nargs='*', help='list of paths to backup')
         # different list because dest=paths doesn't work, it gets
         # overwritten by the next one
         group.add_argument('-p', '--path', action='append',
-                          help="""add path to list of paths to backup,
-                                  mostly useful for the configuration file""")
+                           help="""add path to list of paths to backup,
+                                   mostly useful for the configuration
+                                   file""")
         if 'BUP_DIR' in os.environ:
             defdir = os.environ['BUP_DIR']
         else:
             defdir = None
-        group.add_argument('-d', '--repository',
-                          default = defdir,
-                          help="""the directory to backup to, defaults
+        group.add_argument('-d', '--repository', default=defdir,
+                           help="""the directory to backup to, defaults
                                   to $BUP_DIR (%s)"""
-                          % defdir)
+                           % defdir)
         # using the hostname as branch name
         group.add_argument('-n', '--name', default=socket.gethostname(),
-                          help="""name of the backup passed to bup,
-                                  defaults to hostname (%(default)s)""")
+                           help="""name of the backup passed to bup,
+                                   defaults to hostname (%(default)s)""")
         group.add_argument('-r', '--remote', default=None,
-                          help="""a SSH address to save the backup remotely (example: bup@example.com:repos/repo.bup)""")
+                           help="""a SSH address to save the backup remotely
+                           (example: bup@example.com:repos/repo.bup)""")
         group.add_argument('-x', '--exclude', action='append',
-                          help="""exclude regex pattern,
-                                  will be passed as --exclude-rx to bup""")
-        group = self.add_argument_group('Extra jobs', 
-                                        'Those are extra features that bup-cron will run before or after the backup')
+                           help="""exclude regex pattern,
+                                   will be passed as --exclude-rx to bup""")
+        group = self.add_argument_group('Extra jobs',
+                                        '''Those are extra features that
+                                        bup-cron will run before or after
+                                        the backup''')
         group.add_argument('--clear', action='store_true',
-                          help="""redo a full backup
-                                  (runs bup index --clear before starting)""")
+                           help="""redo a full backup
+                                   (runs bup index --clear before starting)""")
         group.add_argument('--parity', action='store_true',
-                          help="""generate recovery blocks after backup.
-                                  runs bup fsck -g after the backup,
-                                  requires par2(1).""")
+                           help="""generate recovery blocks after backup.
+                                   runs bup fsck -g after the backup,
+                                   requires par2(1).""")
         group.add_argument('-s', '--snapshot', nargs='?', default='no',
-                          const='lvm', choices=self.snapshot_names,
+                           const='lvm', choices=self.snapshot_names,
                            type=str.upper,
-                          help="""snapshot filesystem before backup.
-                                  this will automatically guess the
-                                  path to the logical volume, create a
-                                  snapshot, mount it, then remove it
-                                  when it is done, default: %(default)s""")
+                           help="""snapshot filesystem before backup.
+                                   this will automatically guess the
+                                   path to the logical volume, create a
+                                   snapshot, mount it, then remove it
+                                   when it is done, default: %(default)s""")
         group.add_argument('-z', '--size', action='store',
-                          default=Snapshot.size,
-                          help="""size of the LVM snapshot,
-                                  defaults to %(default)s""")
+                           default=Snapshot.size,
+                           help="""size of the LVM snapshot,
+                                   defaults to %(default)s""")
         group.add_argument('-m', '--mountpoint', action='store',
-                          default=Snapshot.mountpattern,
-                          help="""mountpoint of the snapshot device.
-                                  should contain two %%s patterns, for
-                                  the VG and LV names, default:
-                                  %(default)s)""")
+                           default=Snapshot.mountpattern,
+                           help="""mountpoint of the snapshot device.
+                                   should contain two %%s patterns, for
+                                   the VG and LV names, default:
+                                   %(default)s)""")
         group.add_argument('--stats', action='store_true',
-                          help="""save statistics about backups as a git note""")
+                           help="""save statistics about backups
+                           as a git note""")
         group = self._optionals
         group.title = 'Daemon and logging'
-        group.description = '''Those options define how bup-cron itself will behave'''
+        group.description = '''Those options define how bup-cron
+                               itself will behave'''
         group.add_argument('--copyright', action='store_true',
                            help='''display copyright notice and exit''')
         group.add_argument('-v', '--verbose', action='count',
-                          help="""output more information on console.
+                           help="""output more information on console.
 tries to be silent if not specified.
 -v implies explaining what we do,
 -vv shows output of commands,
 -vvv passes verbose to those commands""")
         group.add_argument('-D', '--debug', action='store_true',
-                          help="""print debug backtrace on unhandled exceptions
-                                  - by default only the message is printed""")
+                           help="""print debug backtrace on unhandled exceptions\
+                                   - by default only the message is printed""")
         group.add_argument('-l', '--logfile', default=sys.stdout,
-                          help="""file where logs should be written,
-                                  defaults to stdout""")
-        levels = [ i for i in logging._levelNames.keys() if (type(i) == str and i != 'NOTSET') ]
+                           help="""file where logs should be written,
+                                   defaults to stdout""")
+        levels = [i for i in logging._levelNames.keys()
+                  if (type(i) == str and i != 'NOTSET')]
         group.add_argument('--syslog', nargs='?', default=None,
                            type=str.upper, action='store',
-                          const='INFO', choices=levels,
-                          help="""log to syslog facility, default: %(default)s""")
+                           const='INFO', choices=levels,
+                           help="""log to syslog facility,
+                           default: %(default)s""")
         group.add_argument('--pidfile', default=None, action='store',
-                          help="""lockfile to write to avoid
-                                  simultanous execution, defaults to
-                                  $BUP_DIR/%s"""
-                          % self.pidfile)
+                           help="""lockfile to write to avoid
+                                   simultanous execution, defaults to
+                                   $BUP_DIR/%s"""
+                           % self.pidfile)
 
     def convert_arg_line_to_args(self, arg_line):
         """parse a config file"""
@@ -295,21 +304,21 @@ class LvmSnapshot(Snapshot):
                     else:
                         logging.warn("""failed to mount snapshot %s on %s,
 skipping snapshotting"""
-                                  % (self.snapname(),
-                                     self.mountpoint()))
+                                     % (self.snapname(),
+                                        self.mountpoint()))
                         self.cleanup()
                 else:
                     logging.warn("""failed to create snapshot %s/%s,
 skipping snapshooting"""
-                              % self.vg_lv)
+                                 % self.vg_lv)
             else:
                 # XXX: we could try to find the parent mountpoint...
                 # see https://github.com/pfrouleau/bup/commit/1244a2da0bf480591b19b9b6123a51ab8662ab56
                 logging.warn('%s is not a LVM mountpoint, skipping snapshotting'
-                          % self.path)
+                             % self.path)
         else:
             logging.warn('%s is not a mountpoint, skipping snapshotting'
-                      % self.path)
+                         % self.path)
         return self
 
     def find_device(self):
@@ -407,7 +416,7 @@ if sys.platform.startswith('cygwin'):
                 self.mount(fs_root)
             else:
                 logging.warn("""failed to create snapshot for %s, skipping snapshotting""" %
-                          self.path)
+                             self.path)
             return self
 
         def cleanup(self, force=False):
@@ -426,7 +435,7 @@ if sys.platform.startswith('cygwin'):
                 logging.info('removed directory %s' % self.mountpattern)
 
         def _convert_path(self, path, spec):
-            return subprocess.check_output(['cygpath', spec, path]).replace('\n','')
+            return subprocess.check_output(['cygpath', spec, path]).replace('\n', '')
 
         def _convert2dos(self, linux_path):
             return self._convert_path(linux_path, '-aw')
@@ -440,7 +449,7 @@ if sys.platform.startswith('cygwin'):
                 logging.info('creating snapshot on %s' % device)
                 # Note: Windows XP does not supports permanent shadows (-p)
                 output = subprocess.check_output(['vshadow', '-p', device])
-                #* SNAPSHOT ID = {5a698842-f325-404a-83e7-6a7fa08760a1}
+                # * SNAPSHOT ID = {5a698842-f325-404a-83e7-6a7fa08760a1}
                 self.shadow_id = re.search("\* SNAPSHOT ID = (\{[0-9A-Fa-f-]{36}\})", output).group(1)
                 logging.info('Shadow copy created: %s' % self.shadow_id)
                 self.exists = True
@@ -452,10 +461,11 @@ if sys.platform.startswith('cygwin'):
         def _fail_if_mounted(self):
             """throw if the mount point is already used
 
-            The only way to unmount a mounted shadow copy is to erase it, so leave that
-            decision to the user."""
+            The only way to unmount a mounted shadow copy is to erase
+            it, so leave that decision to the user.
+            """
             output = subprocess.check_output(['vshadow', '-q'])
-            winmount = self._convert2dos(self.mountpattern).replace('\\','\\\\')
+            winmount = self._convert2dos(self.mountpattern).replace('\\', '\\\\')
             mounted = re.search("^   - Exposed locally as: (%s)." % winmount,
                                 output, re.MULTILINE | re.IGNORECASE)
             if mounted is not None:
@@ -473,13 +483,13 @@ if sys.platform.startswith('cygwin'):
             if make_dirs_helper(self.mountpattern):
                 logging.info('mountpoint %s created' % self.mountpattern)
             winmount = self._convert2dos(self.mountpattern)
-            if len(winmount) == 3: # if it is a drive letter,
-                winmount = winmount[:-1] # remove the trailing backslash
+            if len(winmount) == 3:  # if it is a drive letter,
+                winmount = winmount[:-1]  # remove the trailing backslash
             if self.call(['vshadow', "-el=%s,%s" % (self.shadow_id, winmount)]):
                 self.path = self.path.replace(fs_root, self.mountpattern)
             else:
                 logging.warn("""failed to mount snapshot %s on %s, skipping snapshotting""" %
-                          (self.shadow_id, self.mountpattern))
+                             (self.shadow_id, self.mountpattern))
                 self.cleanup(True)
 
 
@@ -490,7 +500,8 @@ class Bup():
 
     @staticmethod
     def init(remote_rep):
-        logging.info("initializing bup's dir %s" % quote(os.environ['BUP_DIR']))
+        logging.info("initializing bup's dir %s"
+                     % quote(os.environ['BUP_DIR']))
         cmd = ['bup', 'init']
         if remote_rep:
             cmd += ['-r', remote_rep]
@@ -530,7 +541,7 @@ no recovery blocks written""")
         if GlobalLogger().verbose >= 4:
             cmd += ['--verbose']
         if excludes:
-           cmd += map((lambda ex: '--exclude=' + ex), excludes)
+            cmd += map((lambda ex: '--exclude=' + ex), excludes)
         if excludes_rx:
             cmd += map((lambda ex: '--exclude-rx=' + ex), excludes_rx)
         if one_file_system:
@@ -611,7 +622,7 @@ class Pidfile():
                     try:
                         os.remove(self.pidfile)
                         logging.warn('removed staled lockfile %s'
-                                            % (self.pidfile))
+                                     % (self.pidfile))
                         self.pidfd = os.open(self.pidfile,
                                              os.O_CREAT
                                              | os.O_WRONLY
@@ -735,10 +746,10 @@ class GlobalLogger(Singleton):
                 sl = logging.handlers.SysLogHandler(address='/dev/log')
                 sl.setFormatter(logging.Formatter('%(filename)s[%(process)d]: %(message)s'))
                 # convert syslog argument to a numeric value
-                numeric_level = getattr(logging, args.syslog.upper(), None)
-                if not isinstance(numeric_level, int):
+                loglevel = getattr(logging, args.syslog.upper(), None)
+                if not isinstance(loglevel, int):
                     raise ValueError('Invalid log level: %s' % loglevel)
-                sl.setLevel(numeric_level)
+                sl.setLevel(loglevel)
                 logging.getLogger('').addHandler(sl)
             # log everything in main logger
             logging.getLogger('').setLevel(logging.DEBUG)
@@ -757,7 +768,6 @@ class GlobalLogger(Singleton):
                 # serve back the stream to other processes
                 self._log = fh.stream
                 logging.getLogger('').addHandler(fh)
-
 
     def check_call(self, cmd):
         """call a procss, log it to the logfile
@@ -797,7 +807,9 @@ class Timer(object):
         return 'elasped: %s (%s)' % (str(self.diff()), self.times())
 
 
-_quotable=re.compile('\s') # Any white space char (respects UNICODE)
+_quotable = re.compile('\s')  # Any white space char (respects UNICODE)
+
+
 def quote(str):
     """Quote str if it contains white spaces"""
     if _quotable.search(str):
@@ -825,7 +837,9 @@ def make_dirs_helper(path):
         return False
 
 
-du_cmd = ['du', '-bs', '--exclude=*.midx', '--exclude=*.bloom', '--exclude=*.par2']
+du_cmd = ['du', '-bs',
+          '--exclude=*.midx', '--exclude=*.bloom', '--exclude=*.par2']
+
 
 def set_rep_info_before(info, remote):
     info['local_bup'] = subprocess.check_output(['bup', '--version']).rstrip('\n')
@@ -859,7 +873,8 @@ def set_rep_info_after(info, remote):
     else:
         server, repo_path = remote.split(':')
         obj_path = os.path.join(repo_path, 'objects/pack')
-        remote_cmd = '%s "%s" | cut -f1 || echo "-1"' % (' '.join(du_cmd), obj_path)
+        remote_cmd = '%s "%s" | cut -f1 || echo "-1"' % (' '.join(du_cmd),
+                                                         obj_path)
         cmd = ['ssh', '-T', server, remote_cmd]
         output = subprocess.check_output(cmd)
     info['size_after'] = int(output.split('\t')[0])
@@ -916,18 +931,22 @@ def save_stats(info, remote):
         remote_cmd = ('export GIT_DIR="{0}"; '
                       'echo "{1}" > "$GIT_DIR/bup-cron-{2}.txt"; '
                       'git notes add -F "$GIT_DIR/bup-cron-{2}.txt" {2}; '
-                      'rm "$GIT_DIR/bup-cron-{2}.txt"'.format(repo_path, txt_note, info['branch']))
+                      'rm "$GIT_DIR/bup-cron-{2}.txt"'.format(repo_path,
+                                                              txt_note,
+                                                              info['branch']))
         cmd = ['ssh', '-T', server, remote_cmd]
         GlobalLogger().check_call(cmd)
+
 
 def process(args):
     """main processing loop"""
     # current lvm object to cleanup in exception handlers
     for path in args.paths:
         with Snapshot.select(args.snapshot)(path, args.size,
-                             logging.info, logging.warn,
-                             GlobalLogger().verbose, GlobalLogger().check_call,
-                             args.mountpoint) as snapshot:
+                                            logging.info, logging.warn,
+                                            GlobalLogger().verbose,
+                                            GlobalLogger().check_call,
+                                            args.mountpoint) as snapshot:
             rep_info = dict()
             if args.stats:
                 set_rep_info_before(rep_info, args.remote)
@@ -939,7 +958,7 @@ def process(args):
             if not Bup.index(snapshot.path, args.exclude, None, True):
                 logging.warn('skipping save because index failed!')
                 continue
-            rep_info['branch'] = args.name + '-' + snapshot.src_path.replace('/', '_')
+            rep_info['branch'] = '%s-%s' % (args.name, snapshot.src_path.replace('/', '_'))
             Bup.save([snapshot.path], rep_info['branch'],
                      snapshot.path, args.remote)
 
