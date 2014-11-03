@@ -857,25 +857,29 @@ class BupCronMetaData(object):
         git_output = subprocess.check_output(['git', '--version']).rstrip('\n')
         self.local_git = re.match('git version (.*)', git_output).group(1)
         self.local_python = platform.python_version()
+        if self.remote:
+            server, repo_path = self.remote.split(':')
+            cmd = ('bup --version ;'
+                   'git --version ;'
+                   'python --version 2>&1' )
+            cmd = [ 'ssh', '-T', server, cmd ]
+            logging.debug('calling command `%s`' % cmd)
+            bup, git, python = subprocess.check_output(cmd).split('\n', 2)
+            self.remote_bup = bup
+            self.remote_git = re.match('git version (.*)', git).group(1)
+            self.remote_python = re.match('Python (.*)', python).group(1)            
 
     def disk_usage(self):
         if not self.remote:
             obj_path = os.path.join(os.environ['BUP_DIR'], 'objects/pack')
             cmd = self.du_cmd + [obj_path]
-            self.sizes.append(int(subprocess.check_output(cmd).split('\t')[0]))
         else:
             server, repo_path = self.remote.split(':')
             obj_path = os.path.join(repo_path, 'objects/pack')
-            remote_cmd = ('bup --version || echo "-?bup?-"; '
-                          'git --version | cut -f3 -d" " || echo "-?git?-"; '
-                          'python --version 2>&1 | cut -f2 -d" " || echo "-?python?-"; '
-                          '%s "%s" | cut -f1 || echo "-1"') % (' '.join(self.du_cmd), obj_path)
-            cmd = ['ssh', '-T', server, remote_cmd]
-            ssh_output = subprocess.check_output(cmd).split('\n')
-            self.remote_bup = ssh_output[0]
-            self.remote_git = ssh_output[1]
-            self.remote_python = ssh_output[2]
-            self.sizes.append(int(ssh_output[3]))
+            remote_cmd = ('%s "%s" | cut -f1 || echo "-1"') % (' '.join(self.du_cmd), obj_path)
+            cmd = ['ssh', '-T', server, ' '.join(self.du_cmd), "'%s'" % obj_path]
+        logging.debug('calling command `%s`' % cmd)
+        self.sizes.append(int(subprocess.check_output(cmd).split('\t')[0]))
 
     @staticmethod
     def format_bytes(num, suffix='B'):
