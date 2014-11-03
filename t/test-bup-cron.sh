@@ -57,8 +57,9 @@ d21"
 WVPASS rm -fr "$tmpdir/dst"
 
 WVSTART "bup-cron: --stats generates git notes, the last one with content"
+branch_name=stats-${tmpdir//\//_}_src_dir2
 WVPASS bup-cron --name stats --stats "$tmpdir/src/dir2"
-WVPASS git notes show $(git notes | head -1 | awk '{print $NF}' | grep .)
+WVPASS git show $branch_name
 
 WVSTART "bup-cron: test remote host support in $HOST:$BUP_DIR"
 branch_name=remote-${tmpdir//\//_}_src_dir1
@@ -70,7 +71,7 @@ x"
 WVSTART "bup-cron: test remote stats support"
 branch_name=remote-${tmpdir//\//_}_src_dir1
 WVPASS bup-cron --name remote --stats -r $HOST:$BUP_DIR "$tmpdir/src/dir1"
-WVPASS git notes show $(git notes | head -1 | awk '{print $NF}' | grep .)
+WVPASS git notes show $branch_name
 
 # MISSING TESTS:
 # * logfile
