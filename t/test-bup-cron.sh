@@ -59,9 +59,14 @@ WVSTART "bup-cron: --stats generates some git notes"
 WVPASS bup-cron --name stats --stats "$tmpdir/src/dir2"
 WVPASS git notes | grep .
 
-# TODO:
-# test logfile
-# test jobfile
+# MISSING TESTS:
+# * logfile
+# * syslog
+# * remote
+# * fsck?
+# * clear?
+# * exclude patterns?
+# * pidfile
 # if ROOT:
 # - test snapshot
 #	- lvm
