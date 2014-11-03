@@ -906,9 +906,9 @@ Local versions
 *    git: %s
 * python: %s
 ''' % (
-            BupCronMetaData.format_bytes(self.sizes[-2]), self.sizes[-2],
-            BupCronMetaData.format_bytes(self.sizes[-1]), self.sizes[-1],
-            BupCronMetaData.format_bytes(size_diff), size_diff,
+            self.format_bytes(self.sizes[-2]), self.sizes[-2],
+            self.format_bytes(self.sizes[-1]), self.sizes[-1],
+            self.format_bytes(size_diff), size_diff,
             self.local_bup, self.local_git, self.local_python)
         if self.remote:
             str += '''
