@@ -11,14 +11,13 @@ commandline with a @ prefix (e.g. @foo.conf).
 
 at least path and repo need to be specified."""
 
-__copy__ = '''(C) 2013-2014 Antoine Beaupré <anarcat@debian.org>
-This program comes with ABSOLUTELY NO WARRANTY.  This is free
+__version_info__ = ('1', '0')
+__version__ = '.'.join(__version_info__)
+__copyright__ = '''(C) 2013-2014 Antoine Beaupré <anarcat@debian.org>'''
+__warranty__ = '''This program comes with ABSOLUTELY NO WARRANTY.  This is free
 software, and you are welcome to redistribute it under certain
 conditions; see `--copyright` for details.'''
-
-__copyright__ = '''(C) 2013-2014 Antoine Beaupré <anarcat@debian.org>
-
-This program is free software: you can redistribute it and/or modify
+__license__ = '''This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or (at
 your option) any later version.
@@ -73,7 +72,8 @@ class ArgumentConfigParser(argparse.ArgumentParser):
 
         """various settings for the argument parser"""
         argparse.ArgumentParser.__init__(self,
-                                         description=__copy__,
+                                         description=__copyright__
+                                         + "\n" + __warranty__,
                                          epilog=__doc__ %
                                          " or ".join(self.configs),
                                          fromfile_prefix_chars='@')
@@ -143,6 +143,8 @@ class ArgumentConfigParser(argparse.ArgumentParser):
                                itself will behave'''
         group.add_argument('--copyright', action='store_true',
                            help='''display copyright notice and exit''')
+        group.add_argument('--version', action='store_true',
+                           help='''display version number and exit''')
         group.add_argument('-v', '--verbose', action='count',
                            help="""output more information on console.
 tries to be silent if not specified.
@@ -191,7 +193,9 @@ tries to be silent if not specified.
                 pass
         args = argparse.ArgumentParser.parse_args(self)
         if args.copyright:
-            self.exit(0, __copyright__)
+            self.exit(0, __license__)
+        if args.version:
+            self.exit(0, __version__ + "\n")
         if 'BUP_DIR' not in os.environ and not args.repository:
             self.error('argument -d/--repository is required')
 
