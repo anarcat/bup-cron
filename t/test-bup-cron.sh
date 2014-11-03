@@ -10,6 +10,7 @@ tmpdir="$(WVPASS wvmktempdir)" || exit $?
 
 export BUP_DIR="$tmpdir/repo.bup"
 export GIT_DIR="$BUP_DIR"
+HOST=localhost
 
 bup() { "$top/bup" "$@"; }
 bup-cron() { "$top/contrib/bup-cron" --debug -vvv --pidfile "$tmpdir/bup-cron.pid" "$@"; }
@@ -57,12 +58,23 @@ WVPASS rm -fr "$tmpdir/dst"
 
 WVSTART "bup-cron: --stats generates git notes, the last one with content"
 WVPASS bup-cron --name stats --stats "$tmpdir/src/dir2"
-WVPASS git notes show $(git notes | tail -1 | awk '{print $NF}' | grep .)
+WVPASS git notes show $(git notes | head -1 | awk '{print $NF}' | grep .)
+
+WVSTART "bup-cron: test remote host support in $HOST:$BUP_DIR"
+branch_name=remote-${tmpdir//\//_}_src_dir1
+WVPASS bup-cron --name remote -r $HOST:$BUP_DIR "$tmpdir/src/dir1"
+WVPASSEQ "$(WVPASS bup ls /$branch_name/latest/)" "d10
+d11
+x"
+
+WVSTART "bup-cron: test remote stats support"
+branch_name=remote-${tmpdir//\//_}_src_dir1
+WVPASS bup-cron --name remote --stats -r $HOST:$BUP_DIR "$tmpdir/src/dir1"
+WVPASS git notes show $(git notes | head -1 | awk '{print $NF}' | grep .)
 
 # MISSING TESTS:
 # * logfile
 # * syslog
-# * remote
 # * fsck?
 # * clear?
 # * exclude patterns?
