@@ -840,7 +840,7 @@ def make_dirs_helper(path):
             raise
         return False
 
-class BupMetaData(object):
+class BupCronMetaData(object):
     '''class to store metadata about a backup run'''
 
     du_cmd = ['du', '-bs',
@@ -891,18 +891,25 @@ class BupMetaData(object):
         self.size_after = int(output.split('\t')[0])
 
     @staticmethod
-    def format_num(val):
-        return locale.format("%d", val, grouping=True)
+    def format_bytes(num, suffix='B'):
+        '''format the given number as a human-readable size
+
+        inspired by http://stackoverflow.com/a/1094933/1174784'''
+        for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+            if abs(num) < 1024.0:
+                return "%3.1f%s%s" % (num, unit, suffix)
+            num /= 1024.0
+        return "%.1f%s%s" % (num, 'Yi', suffix)
 
     def format_note(self):
         size_diff = self.size_after - self.size_before
         txt_sizes = """Repository size:
-      - Before = %15s
-      - After  = %15s
-      - Diff   = %15s""" % (
-        BupMetaData.format_num(self.size_before),
-        BupMetaData.format_num(self.size_after),
-        BupMetaData.format_num(size_diff))
+      - Before = %15s (%s bytes)
+      - After  = %15s (%s bytes)
+      - Diff   = %15s (%s bytes)""" % (
+        BupCronMetaData.format_bytes(self.size_before), self.size_before,
+        BupCronMetaData.format_bytes(self.size_after), self.size_after,
+        BupCronMetaData.format_bytes(size_diff), size_diff)
         if not self.remote:
             txt_tools = """Tools versions:
       -    bup: %s
