@@ -55,9 +55,9 @@ WVPASSEQ "$(WVPASS ls "$tmpdir/dst/latest/")" "d20
 d21"
 WVPASS rm -fr "$tmpdir/dst"
 
-WVSTART "bup-cron: --stats generates some git notes"
+WVSTART "bup-cron: --stats generates git notes, the last one with content"
 WVPASS bup-cron --name stats --stats "$tmpdir/src/dir2"
-WVPASS git notes | grep .
+WVPASS git notes show $(git notes | tail -1 | awk '{print $NF}' | grep .)
 
 # MISSING TESTS:
 # * logfile
