@@ -921,25 +921,17 @@ Remote versions
         # We must use a temporary file otherwise the EOL are not written
         # correctly in the note.
         if not self.remote:
-            fd, tmpfile = tempfile.mkstemp(prefix='bup-cron-', suffix='.txt',
-                                           dir=os.environ['BUP_DIR'], text=True)
-            os.write(fd, txt_note)
-            os.close(fd)
-            os.environ['GIT_DIR'] = os.environ['BUP_DIR']
-            cmd = ['git', 'notes', 'add', '-F', tmpfile, self.branch]
-            GlobalLogger().check_call(cmd)
-            os.remove(tmpfile)
+            cmd = ['git', '--git-dir', os.environ['BUP_DIR'], 'notes', 'add',
+                   '-F', '-', self.branch]
         else:
-            os.environ['BUP_CRON_STAT'] = txt_note
             server, repo_path = self.remote.split(':')
-            remote_cmd = ('export GIT_DIR="{0}"; '
-                          'echo "{1}" > "$GIT_DIR/bup-cron-{2}.txt"; '
-                          'git notes add -F "$GIT_DIR/bup-cron-{2}.txt" {2}; '
-                          'rm "$GIT_DIR/bup-cron-{2}.txt"'.format(repo_path,
-                                                                  txt_note,
-                                                                  self.branch))
-            cmd = ['ssh', '-T', server, remote_cmd]
-            GlobalLogger().check_call(cmd)
+            cmd = ['ssh', '-T', server,
+                   "git --git-dir='{0}' notes add -F - '{1}'".format(repo_path,
+                                                                     self.branch)]
+        logging.debug('calling command `%s`' % cmd)
+        process = subprocess.Popen(cmd, stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE)
+        (out, err) = process.communicate(str(self))
 
 
 def process(args):
