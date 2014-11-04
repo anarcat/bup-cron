@@ -63,12 +63,12 @@ class ArgumentConfigParser(argparse.ArgumentParser):
     configs = ['/etc/bup-cron.conf',
                '~/.bup-cron.conf',
                '~/.config/bup-cron.conf']
-    snapshot_names = ['lvm', 'no']
+    snapshot_names = ['LVM', 'NO']
     pidfile = '.bup-cron.pid'
 
     def __init__(self):
         if sys.platform.startswith('cygwin'):
-            self.snapshot_names += ['vss']
+            self.snapshot_names += ['VSS']
 
         """various settings for the argument parser"""
         argparse.ArgumentParser.__init__(self,
@@ -116,8 +116,8 @@ class ArgumentConfigParser(argparse.ArgumentParser):
                            help="""generate recovery blocks after backup.
                                    runs bup fsck -g after the backup,
                                    requires par2(1).""")
-        group.add_argument('-s', '--snapshot', nargs='?', default='no',
-                           const='lvm', choices=self.snapshot_names,
+        group.add_argument('-s', '--snapshot', nargs='?', default='NO',
+                           const='LVM', choices=self.snapshot_names,
                            type=str.upper,
                            help="""snapshot filesystem before backup.
                                    this will automatically guess the
