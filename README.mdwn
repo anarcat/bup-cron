@@ -1,0 +1,263 @@
+# Bup cron wrapper #
+
+This is a simple wrapper around [bup][] to make it easier to run nightly
+backup jobs. While it's designed to run under cron, it can also be
+called directly. `bup-cron` supports:
+
+ * remote backups
+ * LVM and VSS snapshotting
+ * parity blocks
+ * usage statistics stored as `git notes`
+ * exclude lists
+ * logfile logging (automatically rotated)
+ * syslog logging
+
+Quick introduction
+==================
+
+To run a simple backup of your `Documents` directory to a `bup`
+repository, run:
+
+    ./bup-cron -d bup Documents
+
+The repository will be created it if doesn't exist. You can also use
+the `$BUP_DIR` environment variable the same way you would do with the
+regular `bup` commands. The above will simply run `bup index` and `bup
+save` with the right arguments.
+
+There is a detailed usage available under `./bup-cron --help`.
+
+Installation
+============
+
+`bup-cron` can be ran directly from the source directory, but you can
+also hook it into the regular `bup` commands set by deploying it to
+(e.g.) `/usr/lib/bup/cmd`. The rest of this manual assumes you have
+done so, but you can also simply put `bup-cron` anywhere in your
+`$PATH` and run it as is.
+
+Configuration
+=============
+
+Since `bup-cron` is designed to run automatically, it is capable of
+reading a configuration file. The config file is searched in
+`/etc/bup-cron.conf`, `~/.bup-cron.conf` or `~/.config/bup-cron.conf`,
+in that order. All configuration files are read and the last config
+file will append its configuration to the previous ones. You can also
+pass an arbitrary configuration file on the commandline by passing it
+as an argument, prefixed with `@`. For example, if you have different
+backup jobs you want to run, you could have two cron jobs:
+
+    bup cron @/etc/bup-cron-main.conf
+
+and:
+
+    bup cron @/etc/bup-cron-srv.conf
+
+... with distinct configurations, with common configuration in
+`/etc/bup-cron.conf`.
+
+The content of the configuration file is one argument per line,
+without `--`. For example, this:
+
+    # paths to backup
+    path=/
+    path=/boot
+    path=/usr
+    path=/var
+    path=/home
+    
+    # where to backup to
+    repository=/media/anarcat/calyx/bup
+    
+    # exclude patterns
+    exclude=/\.Trash-
+    exclude=/\.cache/
+    exclude=/[Cc]ache/
+    exclude=/\.local/share/Trash/
+    exclude=/\.thumbnails/
+    exclude=/\.bitcoin/blocks/
+    exclude=/tmp/
+    exclude=/build-area/
+    exclude=/var/log/
+    
+    # snapshot and add par2 parity
+    snapshot
+    parity
+    stats
+    
+    # logging options
+    syslog=DEBUG
+
+Is equivalent to:
+
+    bup cron --path / --path /boot --path /usr --path /var \
+        --repository=/media/anarcat/calyx/bup --exclude=/\.Trash- \
+        --exclude=/\.cache/ --exclude=/[Cc]ache/ \
+        --exclude=/\.local/share/Trash/ 
+        --exclude=/\.thumbnails/ \
+        --exclude=/\.bitcoin/blocks/ \
+        --exclude=/tmp/ \
+        --exclude=/build-area/ \
+        --exclude=/var/log/ \
+        --snapshot \
+        --parity \
+        --stats \
+        --syslog=DEBUG
+
+`bup-cron` does not do any sort of scheduling, that task is left to
+`cron(8)` or the equivalent daemon on your system.
+
+Branch naming
+-------------
+
+By default, `bup-cron` will store the backups in a branch named
+`host-path` where `host` is the hostname of the machine (as returned
+by the `hostname(1)` command) and `path` is the path to be backed
+up. So for example, in the first example above:
+
+    ./bup-cron -d bup Documents
+
+The backups will be in the `example-Documents` branch (assuming the
+hostname is `example`).
+
+Snapshots
+---------
+
+If the `--snapshot` argument is provided, `bup-cron` will attempt to
+make a snapshot of the current filesystem by guessing which `LVM`
+device the target path is associated with. The snapshot is then
+mounted on `/media/bup/vg-lv`, where `vg` is the Volume Group name and
+`lv` is the Logical Volume name. That mountpoint path is configurable
+with the `--mountpoint` option. The snapshot size is by default `1GB`
+and can be tuned with the `--size` option.
+
+`bup-cron` doesn't currently guess the snapshot device very well, so
+it's only adapted to snapshotting complete filesystems and will fail
+to snapshot if the given path is not the filesystem mountpoint.
+
+A failure to create the snapshot will not abort the backup but will
+spawn a warning.
+
+Parity checks
+-------------
+
+If `--parity` is used, `bup-cron` will run `bup fsck -g` after the
+backup, which in turn will call `par2(1)` to make parity blocks for
+the backups.
+
+Statistics
+----------
+
+If `--stats` is used, some basic statistics about disk usage before
+and after the backup will be saved as a git note associated with the
+backup. Example:
+
+    $ bup cron --stat -d backup Documents
+    $ git --git-dir backup show example-Documents
+    commit af47078b8a787fff8f5cd42d067eb2fd92001c88
+    Author: anarcat <anarcat@example>
+    Date:   Thu Nov 6 04:02:20 2014 +0000
+    
+        bup save
+        
+        Generated by command:
+        ['/usr/lib/bup/cmd/bup-save', '--quiet', '--name', 'marcos-foo', '--strip-path', 'foo', 'foo']
+    
+    Notes:
+        Repository size
+        
+        * Before: 14.7KiB (15027 bytes)
+        * After: 16.0KiB (16378 bytes)
+        * Diff: 1.3KiB (1351 bytes)
+        
+        Local versions
+        
+        *    bup: debian/0.25-1
+        *    git: 2.1.1
+        * python: 2.7.8
+
+The format of those notes shouldn't be relied upon and may change in
+the future.
+
+Logging
+-------
+
+By default, `bup-cron` tries to be silent, so it can be run through a
+cron job and leverage the typical *if there is output we send an
+email* adhoc policy. In other words, if everything goes well,
+`bup-cron` will produce no output. You can use the `-v, --verbose`
+argument to print more information on the console. A single `-v` will
+explain what `bup-cron` is doing, `-vv` will also show the
+actual commands called and `-vvv` will also pass `-v` to those
+commands. Example:
+
+    $ bup cron -d backup foo
+    Indexing: 1, done.
+    bloom: adding 1 file (1 object).
+    $ bup cron -vv -d backup foo
+    configured stdout level 10
+    locked pidfile backup/.bup-cron.pid
+    indexing foo
+    calling command `bup index --one-file-system foo`
+    Indexing: 1, done.
+    saving foo
+    calling command `bup save --name marcos-foo --strip-path foo --tree --commit foo`
+    Reading index: 1, done.
+    Saving: 100.00% (0/4k, 1/1 files), done.
+    bloom: adding 1 file (1 object).
+    b316cd132d45aa9de3ca66d58a054fb819c70043
+    3288df3ba7d515181fdf7d65f6bff836e4d9f042
+    removed pidfile backup/.bup-cron.pid
+    elasped: 0:00:00.650106 (user 0.06 system 0.01 chlduser 0.25 chldsystem 0.14)
+
+(Note that the first run still produces output because `bup index` is
+a little too communicative for its own good on the terminal. Through
+`cron(8)` it will stay silent, you can test this with `nohup(1)`.)
+
+However, `bup-cron` can also use `syslog(3)` to send logs to the
+system log. Using syslog, all messages are logged and are sorted by
+the syslog daemon according to their priority. By default, `--syslog`
+will send messages up to the `INFO` level (equivalent of on
+`--verbose` argument), an explicit level can be passed to `--syslog`
+to send more information. For example this will send all message to
+syslog, including `DEBUG`:
+
+    bup cron --syslog DEBUG
+
+Remote backups
+--------------
+
+Remote backups are done with the `--remote HOST` command, where `HOST`
+is in the `user@example.com:path` format. In this case, only the index
+is stored in the `--repository` and the files are stored remotely.
+
+Remote backup support isn't well tested so feedback would be welcome
+on its use.
+
+Other options
+-------------
+
+More minor options are available and should be self-explanatory in the
+`--help` output.
+
+Caveats
+=======
+
+`bup-cron` is a fairly new project and has seen limited testing. It
+may need a little hand holding at first, especially the logging setup
+and configuration. You should test this system as you would any new
+backup system. Bug reports are welcome by email (`anarcat@debian.org`)
+or on the [Github issue queue][].
+
+More information
+================
+
+The [bup][] project has its own documentation which you will need to
+perform restore and inspection of the backups.
+
+See the `--copyright` option for legalese.
+
+ [bup]: https://github.com/bup/bup
+ [Github issue queue]: https://github.com/anarcat/bup-cron/issues
+
