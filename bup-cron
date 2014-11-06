@@ -1,4 +1,6 @@
 #! /usr/bin/python
+# -*- coding: utf-8
+"""Copyrights: Antoine Beaupré from http://src.anarc.at/scripts.git/"""
 
 """
 simple wrapper around bup index and save designed to be ran in cron
