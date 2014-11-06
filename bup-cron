@@ -123,7 +123,8 @@ class ArgumentConfigParser(argparse.ArgumentParser):
                                    this will automatically guess the
                                    path to the logical volume, create a
                                    snapshot, mount it, then remove it
-                                   when it is done, default: %(default)s""")
+                                   when it is done, default: %(default)s,
+                                   LVM if -s specified without argument""")
         group.add_argument('-z', '--size', action='store',
                            default=Snapshot.size,
                            help="""size of the LVM snapshot,
@@ -162,8 +163,9 @@ tries to be silent if not specified.
         group.add_argument('--syslog', nargs='?', default=None,
                            type=str.upper, action='store',
                            const='INFO', choices=levels,
-                           help="""log to syslog facility,
-                           default: %(default)s""")
+                           help="""log to syslog facility, default: no
+                           logging, INFO if --syslog is specified without
+                           argument""")
         group.add_argument('--pidfile', default=None, action='store',
                            help="""lockfile to write to avoid
                                    simultanous execution, defaults to
