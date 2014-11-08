@@ -1,0 +1,29 @@
+bup-cron maintenance instructions
+=================================
+
+This document describes various aspects of the maintenance of this
+software project. For usage instructions, see the
+[README](README.mdwn) file.
+
+Release checklist
+-----------------
+
+ * make sure tests pass
+ * update the `__version_info__` field in `bup-cron`
+ * commit everything
+ * lay down the git tag (`git tag -s x.y`)
+
+Testing instructions
+--------------------
+
+To run the tests, you'll need a copy of the [bup source][] because we
+are using the bup test suite, for historical reasons (we wanted to be
+in core originally).
+
+Simply get a copy of the bup source and uncompress it in the parent
+directory (`../bup`). The test suite also assumes the `bup` is in the
+path and is at least at version `0.26`.
+
+The tests are in the [t/](t) directory.
+
+ [bup source]: https://github.com/bup/bup

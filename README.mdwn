@@ -276,8 +276,10 @@ More information
 The [bup][] project has its own documentation which you will need to
 perform restore and inspection of the backups.
 
-See the `--copyright` option for legalese.
+See the `--copyright` option for legalese, a copy of the license given
+to you is in the [LICENSE](LICENSE) file.
+
+Project maintenance information is in the [HACKING](HACKING.mdwn) file.
 
  [bup]: https://github.com/bup/bup
  [Github issue queue]: https://github.com/anarcat/bup-cron/issues
-
