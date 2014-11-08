@@ -211,10 +211,6 @@ commands. Example:
     removed pidfile backup/.bup-cron.pid
     elasped: 0:00:00.650106 (user 0.06 system 0.01 chlduser 0.25 chldsystem 0.14)
 
-(Note that the first run still produces output because `bup index` is
-a little too communicative for its own good on the terminal. Through
-`cron(8)` it will stay silent, you can test this with `nohup(1)`.)
-
 However, `bup-cron` can also use `syslog(3)` to send logs to the
 system log. Using syslog, all messages are logged and are sorted by
 the syslog daemon according to their priority. By default, `--syslog`
@@ -249,6 +245,30 @@ may need a little hand holding at first, especially the logging setup
 and configuration. You should test this system as you would any new
 backup system. Bug reports are welcome by email (`anarcat@debian.org`)
 or on the [Github issue queue][].
+
+Limitations
+-----------
+
+`bup-cron` has been written on a Debian GNU/Linux (8.x Jessie) system,
+and has seen little testing on other platforms. Any system with proper
+POSIX semantics should be fine, and it has successfully be ran on
+Windows.
+
+The test suite is incomplete.
+
+As shown in the examples above, when `bup-cron` calls `bup-index`, it
+produces output because `bup index` doesn't have a `--quiet` flag
+which makes backups unnecssarily noisy on the terminal. However,
+through `cron(8)` it will stay silent, you can test this with
+`nohup(1)`.)
+
+Missings features
+-----------------
+
+Those are features that could possibly be implemented:
+
+ * --test to run compare-tree after backup
+ * support for snapshots on `BTRFS` and `ZFS`
 
 More information
 ================

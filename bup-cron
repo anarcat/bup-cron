@@ -32,17 +32,6 @@ License along with this program. If not, see
 <http://www.gnu.org/licenses/>.
 '''
 
-"""
-limitations
- * assumes POSIX
- * tests are incomplete
- * see XXX below for more
-
-features missing
- * --test to run compare-tree after backup
- * support for BTRFS, ZFS, etc
-"""
-
 import argparse
 import datetime
 import errno
