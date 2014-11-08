@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
+
+BUP_SRC=../bup
+cd $BUP_SRC
+# make paths absolute, crudely
+BUP_SRC=$PWD
 . ./wvtest-bup.sh
+cd -
 
 set -o pipefail
 
@@ -12,8 +18,7 @@ export BUP_DIR="$tmpdir/repo.bup"
 export GIT_DIR="$BUP_DIR"
 HOST=localhost
 
-bup() { "$top/bup" "$@"; }
-bup-cron() { "$top/contrib/bup-cron" --debug -vvv --pidfile "$tmpdir/bup-cron.pid" "$@"; }
+bup-cron() { "$top/bup-cron" --debug -vvv --pidfile "$tmpdir/bup-cron.pid" "$@"; }
 
 WVPASS bup init
 WVPASS cd "$tmpdir"
@@ -38,7 +43,7 @@ WVPASSEQ "$(WVPASS bup ls /$branch_name/latest/)" "d10
 d11
 x"
 WVPASS bup restore -C "$tmpdir/dst" "$branch_name/latest"
-WVPASS "$top/t/compare-trees" "$tmpdir/src/dir1/" "$tmpdir/dst/latest"
+WVPASS "$BUP_SRC/t/compare-trees" "$tmpdir/src/dir1/" "$tmpdir/dst/latest"
 WVPASSEQ "$(WVPASS ls "$tmpdir/dst/latest/")" "d10
 d11
 x"
@@ -51,7 +56,7 @@ WVPASSEQ "$(WVPASS bup ls /$branch_name/latest/)" "d20
 d21"
 # - stuff from dir1 must not be in B2
 WVPASS bup restore -C "$tmpdir/dst" "$branch_name/latest"
-WVPASS "$top/t/compare-trees" "$tmpdir/src/dir2/" "$tmpdir/dst/latest"
+WVPASS "$BUP_SRC/t/compare-trees" "$tmpdir/src/dir2/" "$tmpdir/dst/latest"
 WVPASSEQ "$(WVPASS ls "$tmpdir/dst/latest/")" "d20
 d21"
 WVPASS rm -fr "$tmpdir/dst"
