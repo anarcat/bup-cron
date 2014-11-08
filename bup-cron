@@ -510,23 +510,31 @@ class Bup():
 
     @staticmethod
     def generate_par2(remote_rep):
+        Bup.fsck(remote_rep, True)
+
+    @staticmethod
+    def fsck(remote_rep, generate_par2=False):
         base_cmd = ['bup', 'fsck']
         if remote_rep:
             # XXX: maybe bup-fsck could learn to work on remote repository
             addr, path = remote_rep.split(':')
             base_cmd = ['ssh', addr, 'bup', '-d', path, 'fsck']
 
-        cmd = base_cmd + ['--par2-ok']
-        if GlobalLogger().check_call(cmd):
-            cmd = base_cmd
-            cmd += ['--generate']
-            if GlobalLogger().verbose >= 3:
-                cmd += ['--verbose']
-            logging.info('generating par2(1) recovery blocks')
-            GlobalLogger().check_call(cmd)
-        else:
-            logging.warn("""bup reports par2(1) as not working,
+        if GlobalLogger().verbose >= 3:
+            base_cmd += ['--verbose']
+
+        if generate_par2:
+            cmd = base_cmd + ['--par2-ok']
+            if not GlobalLogger().check_call(cmd):
+                logging.warn("""bup reports par2(1) as not working,
 no recovery blocks written""")
+                return False
+            cmd = base_cmd + ['--generate']
+            logging.info('generating par2(1) recovery blocks')
+        else:
+            logging.info('verify bup repository')
+        GlobalLogger().check_call(cmd)
+            
 
     @staticmethod
     def index(path, excludes, excludes_rx, one_file_system):
