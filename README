@@ -36,6 +36,12 @@ also hook it into the regular `bup` commands set by deploying it to
 done so, but you can also simply put `bup-cron` anywhere in your
 `$PATH` and run it as is.
 
+`bup-cron` is also available at [PyPI] and can be installed with:
+
+    pip install bup_cron
+
+ [PyPI]: https://pypi.python.org/pypi/bup_cron
+
 Configuration
 =============
 
