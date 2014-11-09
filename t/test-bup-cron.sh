@@ -75,6 +75,13 @@ if bup fsck --par2-ok; then
     WVPASS bup fsck -r
 fi
 
+WVSTART "bup-cron: --check fails then recovers properly"
+WVPASS bup damage "$BUP_DIR"/objects/pack/*.pack -n10 -s1 -S0
+WVFAIL bup-cron --parity --check "$tmpdir/src/dir1"
+WVFAIL bup fsck -r
+WVPASS bup fsck -r
+WVPASS bup-cron --parity --check "$tmpdir/src/dir1"
+
 WVSTART "bup-cron: --stats generates git notes, the last one with content"
 branch_name=stats-${tmpdir//\//_}_src_dir2
 WVPASS bup-cron --name stats --stats "$tmpdir/src/dir2"
