@@ -18,6 +18,7 @@ export BUP_DIR="$tmpdir/repo.bup"
 export GIT_DIR="$BUP_DIR"
 HOST=localhost
 
+git() { command git --no-pager "$@"; }
 bup-cron() { "$top/bup-cron" --debug -vvv --pidfile "$tmpdir/bup-cron.pid" "$@"; }
 
 WVPASS bup init
