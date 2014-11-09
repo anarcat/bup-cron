@@ -8,10 +8,38 @@ software project. For usage instructions, see the
 Release checklist
 -----------------
 
- * make sure tests pass
- * update the `__version_info__` field in `bup-cron`
- * commit everything
- * lay down the git tag (`git tag -s x.y`)
+ * make sure tests pass: `./t/test-bup-cron.sh`
+ * update the `__version_info__` field in `bup_cron/__init__.py`
+ * commit everything: `git commit -a -m'prepare release x.y'`
+ * lay down the git tag: `git tag -s x.y`
+ * make a tarball: `./setup.py sdist`
+ * sign it: `ls dist/*.{egg,tar.gz} | xargs gpg --detach-sign -a`
+ * [upload it][] to `PyPI`: `twine upload dist/*`
+
+ [upload it]: https://python-packaging-user-guide.readthedocs.org/en/latest/distributing.html#uploading-your-project-to-pypi
+
+Packaging
+---------
+
+`bup-cron` is hooked into distutils and is published on PyPI. To
+operate those releases, you will need [pip][] and [twine][] to make
+uploads:
+
+    sudo apt-get install pip twine
+
+... or follow the instructions in the [pip install documentation][]
+then:
+
+    pip install twine
+
+You will also need a registered account on [pip][] with access to the
+`bup-cron` project.
+
+ [pip]: https://pip.pypa.io
+ [twine]: https://github.com/pypa/twine
+ [pip install documentation]: https://pip.pypa.io/en/latest/installing.html
+ [universal wheel]:
+ https://python-packaging-user-guide.readthedocs.org/en/latest/distributing.html#universal-whe
 
 Testing instructions
 --------------------
