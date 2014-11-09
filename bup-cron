@@ -501,16 +501,16 @@ class Bup():
         cmd = ['bup', 'init']
         if remote_rep:
             cmd += ['-r', remote_rep]
-        GlobalLogger().check_call(cmd)
+        return GlobalLogger().check_call(cmd)
 
     @staticmethod
     def clear_index():
         logging.info('clearing the index')
-        GlobalLogger().check_call(['bup', 'index', '--clear'])
+        return GlobalLogger().check_call(['bup', 'index', '--clear'])
 
     @staticmethod
     def generate_par2(remote_rep):
-        Bup.fsck(remote_rep, True)
+        return Bup.fsck(remote_rep, True)
 
     @staticmethod
     def fsck(remote_rep, generate_par2=False):
@@ -533,7 +533,7 @@ no recovery blocks written""")
             logging.info('generating par2(1) recovery blocks')
         else:
             logging.info('verify bup repository')
-        GlobalLogger().check_call(cmd)
+        return GlobalLogger().check_call(cmd)
             
 
     @staticmethod
@@ -573,7 +573,7 @@ no recovery blocks written""")
         if GlobalLogger().verbose >= 2:
             cmd += ['--tree', '--commit']
         cmd += paths
-        GlobalLogger().check_call(cmd)
+        return GlobalLogger().check_call(cmd)
 
 
 class Pidfile():
@@ -944,6 +944,7 @@ Remote versions
 
 def process(args):
     """main processing loop"""
+    success = True
     # current lvm object to cleanup in exception handlers
     for path in args.paths:
         with Snapshot.select(args.snapshot)(path, args.size,
@@ -960,18 +961,23 @@ def process(args):
             #
             # unfortunately, `bup index -x / /var` skips /var...
             if not Bup.index(snapshot.path, args.exclude, None, True):
-                logging.warn('skipping save because index failed!')
+                logging.error('skipping save because index failed!')
+                success = False
                 continue
             branch = '%s-%s' % (args.name, snapshot.src_path.replace('/', '_'))
-            Bup.save([snapshot.path], branch, snapshot.path, args.remote)
+            if not Bup.save([snapshot.path], branch, snapshot.path, args.remote):
+                logging.error('bup save failed on %s' % snapshot.path)
+                success = False
 
             if args.stats:
                 args.stats.branch = branch
-                args.stats.save()
+                if not args.stats.save():
+                    logging.warn('cannot save stats note')
 
-            if args.parity:
-                Bup.generate_par2(args.remote)
+            if args.parity and not Bup.generate_par2(args.remote):
+                logging.warn('could not generate par2 parity blocks')
 
+    return success
 
 def bail(status, timer, msg=None):
     """cleanup on exit"""
@@ -993,21 +999,26 @@ def main():
 
     try:
         if make_dirs_helper(os.environ['BUP_DIR']):
-            Bup.init(args.remote)
+            if not Bup.init(args.remote):
+                logging.error('failed to initialize bup repo')
         else:
             if args.clear:
-                Bup.clear_index()
+                if not Bup.clear_index():
+                    logging.warning('failed to clear the index')
 
         with Pidfile(args.pidfile):
-            process(args)
+            success = process(args)
     except:
         # get exception type and error, but print the traceback in debug
         t, e, b = sys.exc_info()
-        logging.warn('aborting with %s exception: %s' % (t.__name__, e))
         if args.debug:
             logging.warn(traceback.print_tb(b))
-        bail(1, timer)
-    bail(0, timer)
+        bail(2, timer, 'aborted with unhandled exception %s: %s' % (t.__name__, e))
+
+    if success:
+        bail(0, timer)
+    else:
+        bail(1, timer, 'one or more backups failed to complete')
 
 if __name__ == '__main__':
     main()
