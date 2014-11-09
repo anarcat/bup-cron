@@ -102,12 +102,14 @@ class ArgumentConfigParser(argparse.ArgumentParser):
         group.add_argument('--clear', action='store_true',
                            help="""redo a full backup
                                    (runs bup index --clear before starting)""")
-        group.add_argument('--check', action='store_true',
-                           help='''run fsck --quick after backup''')
         group.add_argument('--parity', action='store_true',
                            help="""generate recovery blocks after backup.
                                    runs bup fsck -g after the backup,
                                    requires par2(1).""")
+        group.add_argument('--check', action='store_true',
+                           help='''run fsck --quick after backup''')
+        group.add_argument('--repair', action='store_true',
+                           help='''run fsck -r if fsck fails after backup, implies --check''')
         group.add_argument('-s', '--snapshot', nargs='?', default='NO',
                            const='LVM', choices=self.snapshot_names,
                            type=str.upper,
@@ -205,6 +207,8 @@ tries to be silent if not specified.
         del args.repository
         if args.pidfile is None:
             args.pidfile = os.path.join(os.environ['BUP_DIR'], self.pidfile)
+        # repair implies check
+        args.check |= args.repair
         return args
 
 
@@ -511,11 +515,7 @@ class Bup():
         return GlobalLogger().check_call(['bup', 'index', '--clear'])
 
     @staticmethod
-    def generate_par2(remote_rep):
-        return Bup.fsck(remote_rep, True)
-
-    @staticmethod
-    def fsck(remote_rep, generate_par2=False):
+    def fsck(remote_rep, parity=False, repair=False):
         base_cmd = ['bup', 'fsck']
         if remote_rep:
             # XXX: maybe bup-fsck could learn to work on remote repository
@@ -525,7 +525,7 @@ class Bup():
         if GlobalLogger().verbose >= 3:
             base_cmd += ['--verbose']
 
-        if generate_par2:
+        if parity:
             cmd = base_cmd + ['--par2-ok']
             if not GlobalLogger().check_call(cmd):
                 logging.warn("""bup reports par2(1) as not working,
@@ -533,7 +533,10 @@ no recovery blocks written""")
                 return False
             cmd = base_cmd + ['--generate']
             logging.info('generating par2(1) recovery blocks')
-        else:
+        elif repair:
+            cmd = base_cmd + ['--repair']
+            logging.info('repairing repository')
+        else: # this is --check
             # XXX: always use --quick for now
             cmd = base_cmd + ['--quick']
             logging.info('verify bup repository')
@@ -979,7 +982,8 @@ def process(args):
                 if not args.stats.save():
                     logging.warn('cannot save stats note')
 
-            if args.check and not Bup.fsck(args.remote):
+            if args.check and not Bup.fsck(args.remote,
+                                           repair=args.repair):
                 # it could have found an error and fixed it, check again
                 # XXX: we could check if fsck returns 100 (which means
                 # success) but that would mean refactoring all of
@@ -988,7 +992,7 @@ def process(args):
                     logging.warn('fsck determined there was an error and could not fix it')
                     success = False
 
-            if args.parity and not Bup.generate_par2(args.remote):
+            if args.parity and not Bup.fsck(args.remote, parity=True):
                 logging.warn('could not generate par2 parity blocks')
 
     return success
