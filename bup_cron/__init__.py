@@ -11,7 +11,7 @@ commandline with a @ prefix (e.g. @foo.conf).
 
 at least path and repo need to be specified."""
 
-__version_info__ = ('1', '0')
+__version_info__ = ('1', '1')
 __version__ = '.'.join(__version_info__)
 __author__ = 'Antoine Beaupré'
 __email__ = 'anarcat@debian.org'
