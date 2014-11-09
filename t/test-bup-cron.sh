@@ -61,6 +61,19 @@ WVPASSEQ "$(WVPASS ls "$tmpdir/dst/latest/")" "d20
 d21"
 WVPASS rm -fr "$tmpdir/dst"
 
+WVSTART "bup-cron: --parity generates parity blocks"
+branch_name="$HOSTNAME-${tmpdir//\//_}_src_dir1"
+WVPASS bup-cron --parity "$tmpdir/src/dir1"
+# copy-pasted from upstream t/test-fsck.sh
+WVPASS bup fsck
+WVPASS bup fsck --quick
+WVPASS bup damage "$BUP_DIR"/objects/pack/*.pack -n10 -s1 -S0
+WVFAIL bup fsck --quick
+if bup fsck --par2-ok; then
+    WVFAIL bup fsck -r
+    WVPASS bup fsck -r
+fi
+
 WVSTART "bup-cron: --stats generates git notes, the last one with content"
 branch_name=stats-${tmpdir//\//_}_src_dir2
 WVPASS bup-cron --name stats --stats "$tmpdir/src/dir2"
@@ -81,7 +94,6 @@ WVPASS git notes show $branch_name
 # MISSING TESTS:
 # * logfile
 # * syslog
-# * fsck?
 # * clear?
 # * exclude patterns?
 # * pidfile
