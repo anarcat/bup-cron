@@ -964,6 +964,7 @@ def process(args):
                 logging.error('skipping save because index failed!')
                 success = False
                 continue
+
             branch = '%s-%s' % (args.name, snapshot.src_path.replace('/', '_'))
             if not Bup.save([snapshot.path], branch, snapshot.path, args.remote):
                 logging.error('bup save failed on %s' % snapshot.path)

@@ -104,3 +104,4 @@ WVPASS git notes show $branch_name
 #	- VSS
 
 WVPASS rm -fr "$tmpdir"
+echo "bup-cron tests completed"
