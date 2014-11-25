@@ -96,6 +96,9 @@ class ArgumentConfigParser(argparse.ArgumentParser):
                            (example: bup@example.com:repos/repo.bup)""")
         group.add_argument('-x', '--exclude', action='append',
                            help="""exclude regex pattern,
+                                   will be passed as --exclude to bup""")
+        group.add_argument('--exclude-rx', action='append',
+                           help="""exclude regex pattern,
                                    will be passed as --exclude-rx to bup""")
         group = self.add_argument_group('Extra jobs',
                                         '''Those are extra features that
@@ -969,7 +972,7 @@ def process(args):
             # able to index multiple paths
             #
             # unfortunately, `bup index -x / /var` skips /var...
-            if not Bup.index(snapshot.path, args.exclude, None, True):
+            if not Bup.index(snapshot.path, args.exclude, args.exclude_rx, True):
                 logging.error('skipping save because index failed!')
                 success = False
                 continue
