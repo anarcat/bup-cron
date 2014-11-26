@@ -950,8 +950,11 @@ Remote versions
                                                                      self.branch)]
         logging.debug('calling command `%s`' % cmd)
         process = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-                                   stdout=subprocess.PIPE)
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
         (out, err) = process.communicate(str(self))
+        logging.debug('output: `%s %s` (%d)' % (out, err, process.returncode))
+        return process.returncode == 0
 
 
 def process(args):
