@@ -936,6 +936,24 @@ Remote versions
 ''' % (self.remote_bup, self.remote_git, self.remote_python)
         return str
 
+    def oneline(self):
+        size_diff = self.sizes[-1] - self.sizes[-2]
+        str = 'repository size (before/after/diff): %s/%s/%s (%s/%s/%s), version (bup/git/python): %s/%s/%s' \
+              % (
+                  self.format_bytes(self.sizes[-2]),
+                  self.format_bytes(self.sizes[-1]),
+                  self.format_bytes(size_diff),
+                  self.sizes[-2],
+                  self.sizes[-1],
+                  size_diff,
+                  self.local_bup,
+                  self.local_git,
+                  self.local_python)
+        if self.remote:
+            str += ', remote versions (bup/git/python): %s/%s/%s' \
+                   % (self.remote_bup, self.remote_git, self.remote_python)
+        return str
+
     def save(self):
         self.disk_usage()
         # We must use a temporary file otherwise the EOL are not written
@@ -989,6 +1007,7 @@ def process(args):
                 args.stats.branch = branch
                 if not args.stats.save():
                     logging.warn('cannot save stats note')
+                logging.info(args.stats.oneline())
 
             if args.check and not Bup.fsck(args.remote,
                                            repair=args.repair):
