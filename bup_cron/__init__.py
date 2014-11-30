@@ -760,7 +760,7 @@ class GlobalLogger(Singleton):
             # setup python logging facilities
             if args.syslog:
                 sl = logging.handlers.SysLogHandler(address='/dev/log')
-                sl.setFormatter(logging.Formatter('%(filename)s[%(process)d]: %(message)s'))
+                sl.setFormatter(logging.Formatter('bup-cron[%(process)d]: %(message)s'))
                 # convert syslog argument to a numeric value
                 loglevel = getattr(logging, args.syslog.upper(), None)
                 if not isinstance(loglevel, int):
