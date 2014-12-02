@@ -285,7 +285,8 @@ perform restore and inspection of the backups.
 See the `--copyright` option for legalese, a copy of the license given
 to you is in the [LICENSE](LICENSE) file.
 
-Project maintenance information is in the [HACKING](HACKING.mdwn) file.
+Project maintenance information is in the [HACKING](HACKING.mdwn)
+file. A history of changes is in the [CHANGELOG](CHANGELOG.mdwn).
 
  [bup]: https://github.com/bup/bup
  [Github issue queue]: https://github.com/anarcat/bup-cron/issues
