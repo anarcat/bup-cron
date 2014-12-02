@@ -6,7 +6,6 @@ try:
 except ImportError:
     from distutils.core import setup
 
-from distutils.core import setup
 import bup_cron
 import sys
 
