@@ -15,7 +15,7 @@ Release checklist
  * lay down the git tag: `git tag -s x.y`
  * make a tarball: `./setup.py sdist`
  * sign it: `ls dist/*.{egg,tar.gz} | xargs gpg --detach-sign -a`
- * [upload it][] to `PyPI`: `twine upload dist/*`
+ * [upload it][] to `PyPI`: `twine upload dist/bup_cron-x.y*`
 
  [CHANGELOG]: CHANGELOG
  [upload it]: https://python-packaging-user-guide.readthedocs.org/en/latest/distributing.html#uploading-your-project-to-pypi
