@@ -1,0 +1,30 @@
+bup-cron (1.2)
+
+  * display the proper process name in syslog (closes #2)
+  * log metadata as well as saving it to a git note
+  * proper return code and debugging for note stats save (closes #3)
+  * Fix exclude_rx not working, thanks alFReD-NSH
+
+ -- Antoine Beaupré <anarcat@debian.org>  Mon, 01 Dec 2014 22:37:36 -0500
+
+bup-cron (1.1)
+
+  * make this a package installable as bup_cron on PyPI
+  * run fsck and fail when it doesn't succeed - fsck supports both --check
+    and --repair
+  * properly return failure to the shell if key components fail
+  * --parity test
+  * various fixes and improvements to the test suite
+
+ -- Antoine Beaupré <anarcat@debian.org>  Sun, 09 Nov 2014 17:49:30 -0500
+
+bup-cron (1.0)
+
+  * first official release, result of around 6 months of intermittent
+    development
+  * features LVM and VSS snapshot support, syslog and file logging, remote
+    repositories, exclude patterns, --clear and --parity, filing stats as
+    git notes
+
+ -- Antoine Beaupré <anarcat@debian.org>  Wed, 05 Nov 2014 23:19:18 -0500
+

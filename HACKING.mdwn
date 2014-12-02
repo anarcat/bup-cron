@@ -10,13 +10,16 @@ Release checklist
 
  * make sure tests pass: `./t/test-bup-cron.sh`
  * update the `__version_info__` field in `bup_cron/__init__.py`
+ * update the [CHANGELOG][] with `git changelog` (from [git-extras][])
  * commit everything: `git commit -a -m'prepare release x.y' -S`
  * lay down the git tag: `git tag -s x.y`
  * make a tarball: `./setup.py sdist`
  * sign it: `ls dist/*.{egg,tar.gz} | xargs gpg --detach-sign -a`
  * [upload it][] to `PyPI`: `twine upload dist/*`
 
+ [CHANGELOG]: CHANGELOG
  [upload it]: https://python-packaging-user-guide.readthedocs.org/en/latest/distributing.html#uploading-your-project-to-pypi
+ [git-extras]: https://github.com/tj/git-extras/tree/master/bin
 
 Packaging
 ---------
