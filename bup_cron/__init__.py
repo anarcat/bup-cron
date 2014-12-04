@@ -971,7 +971,8 @@ Remote versions
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         (out, err) = process.communicate(str(self))
-        logging.debug('output: `%s %s` (%d)' % (out, err, process.returncode))
+        if process.returncode != 0:
+            logging.warn('failed to save bup note: `%s%s` (%d)' % (out, err, process.returncode))
         return process.returncode == 0
 
 
@@ -1005,8 +1006,7 @@ def process(args):
 
             if args.stats:
                 args.stats.branch = branch
-                if not args.stats.save():
-                    logging.warn('cannot save stats note')
+                args.stats.save()
                 logging.info(args.stats.oneline())
 
             if args.check and not Bup.fsck(args.remote,
