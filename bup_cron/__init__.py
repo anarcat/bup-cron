@@ -302,7 +302,7 @@ class LvmSnapshot(Snapshot):
                     cmd += ['--verbose']
                 if self.call(cmd):
                     if make_dirs_helper(self.mountpoint()):
-                        logging.info('mountpoint %s created'
+                        logging.debug('mountpoint %s created'
                                      % self.mountpoint())
                     self.exists = True
                     if self.call(['mount', self.device(),
@@ -382,12 +382,12 @@ skipping snapshooting"""
                 raise
         if os.path.ismount(m):
             if self.call(['umount', m]):
-                logging.info('umounted %s' % m)
+                logging.debug('umounted %s' % m)
             else:
                 logging.warn('failed to umount %s' % m)
         try:
             os.removedirs(m)
-            logging.info('removed directory %s' % m)
+            logging.debug('removed directory %s' % m)
         except:
             pass
         device = self.device()
@@ -400,7 +400,7 @@ skipping snapshooting"""
                 cmd += ['--verbose']
             if stat.S_ISBLK(os.stat(device).st_mode):
                 if self.call(cmd):
-                    logging.info('dropped snapshot %s' % device)
+                    logging.debug('dropped snapshot %s' % device)
                 else:
                     logging.warn('failed to drop snapshot %s' % device)
         except OSError:
@@ -429,17 +429,16 @@ if sys.platform.startswith('cygwin'):
         def cleanup(self, force=False):
             if self.shadow_id is not None:
                 device = self._convert2dos(self.src_path)
-                logging.info('dropping snapshot on %s' % device)
+                logging.debug('dropping snapshot on %s' % device)
                 if self.call(['vshadow', '-ds=%s' % self.shadow_id]):
                     self.shadow_id = None
                     self.exits = False
-                    logging.info('dropped snapshot %s' % device)
                 else:
                     logging.warn('failed to drop snapshot %s' % device)
             if os.path.exists(self.mountpattern):
                 self._fail_if_mounted()
                 os.rmdir(self.mountpattern)
-                logging.info('removed directory %s' % self.mountpattern)
+                logging.debug('removed directory %s' % self.mountpattern)
 
         def _convert_path(self, path, spec):
             return subprocess.check_output(['cygpath', spec, path]).replace('\n', '')
@@ -453,12 +452,12 @@ if sys.platform.startswith('cygwin'):
         def create_snapshot(self, device):
             self.cleanup(True)
             try:
-                logging.info('creating snapshot on %s' % device)
+                logging.debug('creating snapshot on %s' % device)
                 # Note: Windows XP does not supports permanent shadows (-p)
                 output = subprocess.check_output(['vshadow', '-p', device])
                 # * SNAPSHOT ID = {5a698842-f325-404a-83e7-6a7fa08760a1}
                 self.shadow_id = re.search("\* SNAPSHOT ID = (\{[0-9A-Fa-f-]{36}\})", output).group(1)
-                logging.info('Shadow copy created: %s' % self.shadow_id)
+                logging.debug('Shadow copy created: %s' % self.shadow_id)
                 self.exists = True
                 return True
             except:
@@ -488,7 +487,7 @@ if sys.platform.startswith('cygwin'):
             """mountpattern must be a path in linux format
             """
             if make_dirs_helper(self.mountpattern):
-                logging.info('mountpoint %s created' % self.mountpattern)
+                logging.debug('mountpoint %s created' % self.mountpattern)
             winmount = self._convert2dos(self.mountpattern)
             if len(winmount) == 3:  # if it is a drive letter,
                 winmount = winmount[:-1]  # remove the trailing backslash
@@ -748,7 +747,16 @@ class Singleton(object):
 
 
 class GlobalLogger(Singleton):
-    """convenient executer with support for logging as well"""
+    """convenient executer with support for logging as well
+
+    ERROR: things that make us exit
+    WARNING: we show only errors (default)
+    INFO: broad steps of what is happening ("saving", "fsck"...), same as -v
+    DEBUG: we explain each step and display commands, same as -vv and -vvv
+
+    we try to be mostly silent by default, and terse when we talk,
+even in info and debug
+    """
 
     def __init__(self, args=None):
         """initialise the singleton, only if never initialised"""
@@ -1028,7 +1036,7 @@ def bail(status, timer, msg=None):
     """cleanup on exit"""
     if msg:
         logging.warn(msg)
-    logging.info(str(timer))
+    logging.info('bup-cron completed, %s' % timer)
     sys.exit(status)
 
 
