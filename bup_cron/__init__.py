@@ -1072,3 +1072,6 @@ def main():
         bail(0, timer)
     else:
         bail(1, timer, 'one or more backups failed to complete')
+
+if __name__ == '__main__':
+    main()

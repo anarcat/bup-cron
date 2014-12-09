@@ -32,17 +32,5 @@ setup(name='bup_cron',
         'Topic :: System :: Archiving :: Backup',
         ],
       packages=['bup_cron'],
-      # XXX: should use http://pythonhosted.org/setuptools/setuptools.html#automatic-script-creation
       scripts=['bup-cron'],
-      # XXX: another way would be to find bup and install it alongside
-      # but the thing below doesn't actually find bup, it just assumes it's in /usr
-      #data_files=[(sys.exec_prefix + '/lib/bup/cmd', ['bup-cron'])],
       )
-
-
-
-
-
-
-
-

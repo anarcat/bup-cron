@@ -1,7 +1,1 @@
-#! /usr/bin/python
-# -*- coding: utf-8
-
-import bup_cron
-
-if __name__ == '__main__':
-    bup_cron.main()
+bup_cron/__init__.py
