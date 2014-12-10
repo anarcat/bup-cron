@@ -1012,11 +1012,6 @@ def process(args):
                 logging.error('bup save failed on %s' % snapshot.path)
                 success = False
 
-            if args.stats:
-                args.stats.branch = branch
-                args.stats.save()
-                logging.info(args.stats.oneline())
-
             if args.check and not Bup.fsck(args.remote,
                                            repair=args.repair):
                 # it could have found an error and fixed it, check again
@@ -1029,6 +1024,11 @@ def process(args):
 
             if args.parity and not Bup.fsck(args.remote, parity=True):
                 logging.warn('could not generate par2 parity blocks')
+
+            if args.stats:
+                args.stats.branch = branch
+                args.stats.save()
+                logging.info(args.stats.oneline())
 
     return success
 
