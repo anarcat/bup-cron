@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+ARGS="${@:---debug}"
 BUP_SRC=../bup
 cd $BUP_SRC
 # make paths absolute, crudely
@@ -19,7 +20,7 @@ export GIT_DIR="$BUP_DIR"
 HOST=localhost
 
 git() { command git --no-pager "$@"; }
-bup-cron() { "$top/bup-cron" --debug -vvv --pidfile "$tmpdir/bup-cron.pid" "$@"; }
+bup-cron() { "$top/bup-cron" "$ARGS" --pidfile "$tmpdir/bup-cron.pid" "$@"; }
 
 WVPASS bup init
 WVPASS cd "$tmpdir"
