@@ -944,9 +944,13 @@ Remote versions
 ''' % (self.remote_bup, self.remote_git, self.remote_python)
         return str
 
-    def oneline(self):
+    def last_diff(self):
         size_diff = self.sizes[-1] - self.sizes[-2]
-        str = 'repository size (before/after/diff): %s/%s/%s (%s/%s/%s), version (bup/git/python): %s/%s/%s' \
+        return 'repository size change: %s' % self.format_bytes(size_diff)
+
+    def summary(self):
+        size_diff = self.sizes[-1] - self.sizes[0]
+        str = 'total repository size (before/after/diff): %s/%s/%s (%s/%s/%s), version (bup/git/python): %s/%s/%s' \
               % (
                   self.format_bytes(self.sizes[-2]),
                   self.format_bytes(self.sizes[-1]),
@@ -987,6 +991,8 @@ Remote versions
 def process(args):
     """main processing loop"""
     success = True
+    if args.stats:
+        args.stats = BupCronMetaData(args.remote)
     # current lvm object to cleanup in exception handlers
     for path in args.paths:
         with Snapshot.select(args.snapshot)(path, args.size,
@@ -995,8 +1001,6 @@ def process(args):
                                             GlobalLogger().check_call,
                                             args.mountpoint) as snapshot:
             rep_info = dict()
-            if args.stats:
-                args.stats = BupCronMetaData(args.remote)
 
             # XXX: this shouldn't be in the loop like this, bup index should be
             # able to index multiple paths
@@ -1028,8 +1032,10 @@ def process(args):
             if args.stats:
                 args.stats.branch = branch
                 args.stats.save()
-                logging.info(args.stats.oneline())
+                logging.info(args.stats.last_diff())
 
+    if args.stats:
+        logging.info(args.stats.summary())
     return success
 
 def bail(status, timer, msg=None):
