@@ -25,7 +25,8 @@ the `$BUP_DIR` environment variable the same way you would do with the
 regular `bup` commands. The above will simply run `bup index` and `bup
 save` with the right arguments.
 
-There is a detailed usage available under `./bup-cron --help`.
+There is a detailed usage available under `./bup-cron --help` and also
+explained below.
 
 Installation
 ============
@@ -111,6 +112,21 @@ Is equivalent to:
         --stats \
         --syslog=DEBUG
 
+This, in turn, is roughly equivalent to:
+
+    export BUP_DIR=/media/anarcat/calyx/bup
+    bup init
+    for path in / /boot /usr /var; do
+        lvcreate -s ... # remember how to make a snapshot? i don't!
+        bup index --exclude [...] $path
+        bup save $path
+        git note ... # create a note with useful stats
+    done
+    bup fsck --par2 --repair
+
+Except that you don't need to remember all that, that it's logged
+through syslog, handles locking, etc.
+
 `bup-cron` does not do any sort of scheduling, that task is left to
 `cron(8)` or the equivalent daemon on your system.
 
@@ -185,6 +201,20 @@ backup. Example:
 
 The format of those notes shouldn't be relied upon and may change in
 the future.
+
+Also note that this will fail if git cannot be run. If you see the
+following error:
+
+    fatal: empty ident name (for <you@example.com>) not allowed
+
+... it's because git isn't configured properly. In that case, you
+should follow the instructions given by git and configure your
+identity correctly, both on the local and remote servers, using:
+
+    git config --global user.email "you@example.com"
+    git config --global user.name "Your Name"
+
+See `git-config(1)` for detailed information about git configuration.
 
 Logging
 -------
