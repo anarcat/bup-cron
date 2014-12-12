@@ -125,7 +125,10 @@ This, in turn, is roughly equivalent to:
     bup fsck --par2 --repair
 
 Except that you don't need to remember all that, that it's logged
-through syslog, handles locking, etc.
+through syslog, handles locking, etc. (Notice also how I forgot to
+create a mountpoint for the LVM snapshot, to mount it and to remove it
+and the snapshot. `bup-cron` makes you not have to think about all
+those pesky things.)
 
 `bup-cron` does not do any sort of scheduling, that task is left to
 `cron(8)` or the equivalent daemon on your system.
