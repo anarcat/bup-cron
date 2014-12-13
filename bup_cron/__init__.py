@@ -300,10 +300,13 @@ class LvmSnapshot(Snapshot):
                     cmd += ['--quiet']
                 if self.verbose >= 3:
                     cmd += ['--verbose']
+                logging.debug('creating snapshot %s' % self.snapname())
                 if self.call(cmd):
+                    logging.debug('making sure mountpoint %s exists'
+                                  % self.mountpoint())
                     if make_dirs_helper(self.mountpoint()):
                         logging.debug('mountpoint %s created'
-                                     % self.mountpoint())
+                                      % self.mountpoint())
                     self.exists = True
                     if self.call(['mount', self.device(),
                                   self.mountpoint()]):
@@ -381,13 +384,12 @@ skipping snapshooting"""
             else:
                 raise
         if os.path.ismount(m):
-            if self.call(['umount', m]):
-                logging.debug('umounted %s' % m)
-            else:
+            logging.debug('umounting %s' % m)
+            if not self.call(['umount', m]):
                 logging.warn('failed to umount %s' % m)
         try:
+            logging.debug('removing directory %s' % m)
             os.removedirs(m)
-            logging.debug('removed directory %s' % m)
         except:
             pass
         device = self.device()
@@ -399,9 +401,8 @@ skipping snapshooting"""
             if self.verbose >= 3:
                 cmd += ['--verbose']
             if stat.S_ISBLK(os.stat(device).st_mode):
-                if self.call(cmd):
-                    logging.debug('dropped snapshot %s' % device)
-                else:
+                logging.debug('dropping snapshot %s' % device)
+                if not self.call(cmd):
                     logging.warn('failed to drop snapshot %s' % device)
         except OSError:
             # normal: the device doesn't exist, moving on
@@ -437,8 +438,8 @@ if sys.platform.startswith('cygwin'):
                     logging.warn('failed to drop snapshot %s' % device)
             if os.path.exists(self.mountpattern):
                 self._fail_if_mounted()
+                logging.debug('removing directory %s' % self.mountpattern)
                 os.rmdir(self.mountpattern)
-                logging.debug('removed directory %s' % self.mountpattern)
 
         def _convert_path(self, path, spec):
             return subprocess.check_output(['cygpath', spec, path]).replace('\n', '')
@@ -457,7 +458,7 @@ if sys.platform.startswith('cygwin'):
                 output = subprocess.check_output(['vshadow', '-p', device])
                 # * SNAPSHOT ID = {5a698842-f325-404a-83e7-6a7fa08760a1}
                 self.shadow_id = re.search("\* SNAPSHOT ID = (\{[0-9A-Fa-f-]{36}\})", output).group(1)
-                logging.debug('Shadow copy created: %s' % self.shadow_id)
+                logging.debug('shadow copy created: %s' % self.shadow_id)
                 self.exists = True
                 return True
             except:
@@ -486,6 +487,7 @@ if sys.platform.startswith('cygwin'):
         def mount(self, fs_root):
             """mountpattern must be a path in linux format
             """
+            logging.debug('making sure mountpoint %s exists' % self.mountpattern)
             if make_dirs_helper(self.mountpattern):
                 logging.debug('mountpoint %s created' % self.mountpattern)
             winmount = self._convert2dos(self.mountpattern)
@@ -543,7 +545,7 @@ no recovery blocks written""")
         else: # this is --check
             # XXX: always use --quick for now
             cmd = base_cmd + ['--quick']
-            logging.info('verify bup repository')
+            logging.info('verifying bup repository')
         return GlobalLogger().check_call(cmd)
             
 
@@ -624,9 +626,9 @@ class Pidfile():
     def create(self):
         """initialise pid file"""
         try:
+            logging.debug('locking pidfile %s' % self.pidfile)
             self.pidfd = os.open(self.pidfile,
                                  os.O_CREAT | os.O_WRONLY | os.O_EXCL)
-            logging.debug('locked pidfile %s' % self.pidfile)
         except OSError as e:
             if e.errno == errno.EEXIST:
                 pid = self._check()
@@ -660,7 +662,7 @@ class Pidfile():
 
     def remove(self):
         """helper function to actually remove the pid file"""
-        logging.debug('removed pidfile %s' % self.pidfile)
+        logging.debug('removing pidfile %s' % self.pidfile)
         os.remove(self.pidfile)
 
     def _check(self):
@@ -1042,7 +1044,7 @@ def bail(status, timer, msg=None):
     """cleanup on exit"""
     if msg:
         logging.warn(msg)
-    logging.info('bup-cron completed, %s' % timer)
+    logging.info('bup-cron %s completed, %s' % (__version__, timer))
     sys.exit(status)
 
 
@@ -1056,6 +1058,7 @@ def main():
     # initialize GlobalLogger singleton
     GlobalLogger(args)
 
+    logging.info('bup-cron %s starting' % __version__)
     try:
         if make_dirs_helper(os.environ['BUP_DIR']):
             if not Bup.init(args.remote):
