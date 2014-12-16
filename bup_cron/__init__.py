@@ -301,6 +301,7 @@ class LvmSnapshot(Snapshot):
                 # forced cleanup
                 self.cleanup(True)
                 cmd = ['lvcreate', '--size', self.size, '--snapshot',
+                       '--permission', 'r',
                        '--name', self.snapname(), device]
                 if self.verbose <= 0:
                     cmd += ['--quiet']
@@ -314,7 +315,8 @@ class LvmSnapshot(Snapshot):
                         logging.debug('mountpoint %s created'
                                       % self.mountpoint())
                     self.exists = True
-                    if self.call(['mount', self.device(),
+                    if self.call(['mount', '-o', 'ro',
+                                  self.device(),
                                   self.mountpoint()]):
                         self.path = self.mountpoint()
                     else:
