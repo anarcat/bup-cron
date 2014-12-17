@@ -100,6 +100,12 @@ class ArgumentConfigParser(argparse.ArgumentParser):
         group.add_argument('--exclude-rx', action='append',
                            help="""exclude regex pattern,
                                    will be passed as --exclude-rx to bup""")
+        group.add_argument('--exclude-from', action='append',
+                           help="""read --exclude paths from filename,
+                                   will be passed as --exclude-from to bup""")
+        group.add_argument('--exclude-rx-from', action='append',
+                           help="""read --exclude-rx patterns from filename,
+                                   will be passed as --exclude-rx-from to bup""")
         group = self.add_argument_group('Extra jobs',
                                         '''Those are extra features that
                                         bup-cron will run before or after
@@ -547,10 +553,11 @@ no recovery blocks written""")
             cmd = base_cmd + ['--quick']
             logging.info('verifying bup repository')
         return GlobalLogger().check_call(cmd)
-            
+
 
     @staticmethod
-    def index(path, excludes, excludes_rx, one_file_system):
+    def index(path, excludes, excludes_rx, excludes_from, excludes_rx_from,
+              one_file_system):
         logging.info('indexing %s' % quote(path))
         # XXX: should be -q(uiet) unless verbose > 0 - but bup
         # index has no -q
@@ -561,6 +568,10 @@ no recovery blocks written""")
             cmd += map((lambda ex: '--exclude=' + ex), excludes)
         if excludes_rx:
             cmd += map((lambda ex: '--exclude-rx=' + ex), excludes_rx)
+        if excludes_from:
+            cmd += map((lambda ex: '--exclude-from=' + ex), excludes_from)
+        if excludes_rx_from:
+            cmd += map((lambda ex: '--exclude-rx-from=' + ex), excludes_rx_from)
         if one_file_system:
             cmd += ['--one-file-system']
         cmd += [path]
