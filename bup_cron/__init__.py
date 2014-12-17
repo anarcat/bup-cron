@@ -95,10 +95,10 @@ class ArgumentConfigParser(argparse.ArgumentParser):
                            help="""a SSH address to save the backup remotely
                            (example: bup@example.com:repos/repo.bup)""")
         group.add_argument('-x', '--exclude', action='append',
-                           help="""exclude regex pattern,
+                           help="""exclude path from the backup,
                                    will be passed as --exclude to bup""")
         group.add_argument('--exclude-rx', action='append',
-                           help="""exclude regex pattern,
+                           help="""exclude path matching regex pattern,
                                    will be passed as --exclude-rx to bup""")
         group.add_argument('--exclude-from', action='append',
                            help="""read --exclude paths from filename,
