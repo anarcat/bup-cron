@@ -967,10 +967,10 @@ Remote versions
         size_diff = self.sizes[-1] - self.sizes[0]
         str = 'total repository size (before/after/diff): %s/%s/%s (%s/%s/%s), version (bup/git/python): %s/%s/%s' \
               % (
-                  self.format_bytes(self.sizes[-2]),
+                  self.format_bytes(self.sizes[0]),
                   self.format_bytes(self.sizes[-1]),
                   self.format_bytes(size_diff),
-                  self.sizes[-2],
+                  self.sizes[0],
                   self.sizes[-1],
                   size_diff,
                   self.local_bup,
