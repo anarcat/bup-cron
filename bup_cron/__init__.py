@@ -1073,9 +1073,9 @@ def main():
 
     logging.info('bup-cron %s starting' % __version__)
     try:
-        if make_dirs_helper(os.environ['BUP_DIR']):
+        if not os.path.exists(os.environ['BUP_DIR']):
             if not Bup.init(args.remote):
-                logging.error('failed to initialize bup repo')
+                bail(3, timer, 'failed to initialize bup repo')
         else:
             if args.clear:
                 if not Bup.clear_index():
@@ -1083,6 +1083,8 @@ def main():
 
         with Pidfile(args.pidfile):
             success = process(args)
+    except SystemExit:
+        return
     except:
         # get exception type and error, but print the traceback in debug
         t, e, b = sys.exc_info()
