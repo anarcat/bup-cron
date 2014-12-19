@@ -47,7 +47,6 @@ import socket
 import stat
 import subprocess
 import sys
-import tempfile
 import traceback
 
 
@@ -348,7 +347,7 @@ skipping snapshooting"""
         try:
             return re.match(r".*^(/[^ ]*) on %s .*" % self.path, mounts,
                             re.MULTILINE | re.DOTALL).group(1)
-        except:
+        except:  # noqa
             return False
 
     @staticmethod
@@ -395,10 +394,10 @@ skipping snapshooting"""
             logging.debug('umounting %s' % m)
             if not self.call(['umount', m]):
                 logging.warn('failed to umount %s' % m)
+        logging.debug('removing directory %s' % m)
         try:
-            logging.debug('removing directory %s' % m)
             os.removedirs(m)
-        except:
+        except:  # noqa
             pass
         device = self.device()
         try:
@@ -469,8 +468,8 @@ if sys.platform.startswith('cygwin'):
                 logging.debug('shadow copy created: %s' % self.shadow_id)
                 self.exists = True
                 return True
-            except:
-                logging.warn('vss snapshot failed, id=%s' % self.shadow_id)
+            except Exception as e:
+                logging.warn('vss snapshot failed, id=%s: %s' % self.shadow_id, e)
                 return False
 
         def _fail_if_mounted(self):
@@ -915,7 +914,6 @@ class BupCronMetaData(object):
         else:
             server, repo_path = self.remote.split(':')
             obj_path = os.path.join(repo_path, 'objects/pack')
-            remote_cmd = ('%s "%s" | cut -f1 || echo "-1"') % (' '.join(self.du_cmd), obj_path)
             cmd = ['ssh', '-T', server, ' '.join(self.du_cmd), "'%s'" % obj_path]
         logging.debug('calling command `%s`' % cmd)
         self.sizes.append(int(subprocess.check_output(cmd).split('\t')[0]))
@@ -1015,7 +1013,6 @@ def process(args):
                                             GlobalLogger().verbose,
                                             GlobalLogger().check_call,
                                             args.mountpoint) as snapshot:
-            rep_info = dict()
 
             # XXX: this shouldn't be in the loop like this, bup index should be
             # able to index multiple paths
@@ -1085,8 +1082,8 @@ def main():
             success = process(args)
     except SystemExit:
         return
-    except:
-        # get exception type and error, but print the traceback in debug
+    except:  # noqa
+        # Get exception type and error, but print the traceback in debug only.
         t, e, b = sys.exc_info()
         if args.debug:
             logging.warn(traceback.print_tb(b))
