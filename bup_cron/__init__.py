@@ -1018,8 +1018,9 @@ def process(args):
             # able to index multiple paths
             #
             # unfortunately, `bup index -x / /var` skips /var...
-            if not Bup.index(snapshot.path, args.exclude, args.exclude_rx, True):
-                logging.error('skipping save because index failed!')
+            if not Bup.index(snapshot.path, args.exclude, args.exclude_rx,
+                             args.exclude_from, args.exclude_rx_from, True):
+                logging.error('Skipping save because index failed!')
                 success = False
                 continue
 
