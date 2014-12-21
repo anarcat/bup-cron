@@ -650,7 +650,7 @@ class Pidfile():
                 else:
                     try:
                         os.remove(self.pidfile)
-                        logging.warn('removed staled lockfile %s'
+                        logging.warn('removed stale lockfile %s'
                                      % (self.pidfile))
                         self.pidfd = os.open(self.pidfile,
                                              os.O_CREAT
