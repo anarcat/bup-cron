@@ -704,9 +704,15 @@ class Pidfile():
 
             try:
                 os.kill(pid, 0)
-            except OSError:
-                logging.debug("can't deliver signal to %s" % pid)
-                return False
+            except OSError as e:
+                if e.errno == errno.ESRCH:
+                    # Not running
+                    logging.debug("process %d is not running" % pid)
+                    return False
+                elif e.errno == errno.EPERM:
+                    # No permission to signal this process!
+                    logging.debug("can't deliver signal to process %d" % pid)
+                    return pid
             else:
                 return pid
 
