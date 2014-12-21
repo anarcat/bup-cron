@@ -1086,10 +1086,9 @@ def main():
             if not os.path.exists(os.environ['BUP_DIR']):
                 if not Bup.init(args.remote):
                     bail(3, timer, 'failed to initialize bup repo')
-            else:
-                if args.clear:
-                    if not Bup.clear_index():
-                        logging.warning('failed to clear the index')
+            elif args.clear:
+                if not Bup.clear_index():
+                    logging.warning('failed to clear the index')
 
             success = process(args)
     except SystemExit:
