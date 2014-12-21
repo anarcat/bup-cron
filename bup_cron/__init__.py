@@ -697,6 +697,11 @@ class Pidfile():
                 # not an integer
                 logging.debug("not an integer: %s" % pidstr)
                 return False
+
+            # First check the proc filesystem, which may not be available.
+            if os.path.exists('/proc/%d' % pid):
+                return pid
+
             try:
                 os.kill(pid, 0)
             except OSError:
