@@ -608,7 +608,13 @@ class Pidfile():
     remove stale files (with invalid pids or that the process
     disappeared)
 
-    it will also cleanup after itself"""
+    it will also cleanup after itself
+
+    this shouldn't have been implemented and should instead use the
+    more common lockfile package:
+
+    https://pypi.python.org/pypi/lockfile
+    """
 
     def __init__(self, path):
         """setup various parameters"""
