@@ -1082,12 +1082,14 @@ def main():
 
     logging.info('bup-cron %s starting' % __version__)
     try:
+        initialised = False
         if not os.path.exists(os.environ['BUP_DIR']):
             if not Bup.init(args.remote):
                 bail(3, timer, 'failed to initialize bup repo')
+            initialised = True
 
         with Pidfile(args.pidfile):
-            if args.clear:
+            if args.clear and not initialised:
                 if not Bup.clear_index():
                     logging.warning('failed to clear the index')
 
