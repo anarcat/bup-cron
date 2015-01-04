@@ -656,7 +656,7 @@ class Pidfile():
                 else:
                     try:
                         os.remove(self.pidfile)
-                        logging.warn('removed staled lockfile %s'
+                        logging.warn('removed stale lockfile %s'
                                      % (self.pidfile))
                         self.pidfd = os.open(self.pidfile,
                                              os.O_CREAT
@@ -703,11 +703,22 @@ class Pidfile():
                 # not an integer
                 logging.debug("not an integer: %s" % pidstr)
                 return False
+
+            # First check the proc filesystem, which may not be available.
+            if os.path.exists('/proc/%d' % pid):
+                return pid
+
             try:
                 os.kill(pid, 0)
-            except OSError:
-                logging.debug("can't deliver signal to %s" % pid)
-                return False
+            except OSError as e:
+                if e.errno == errno.ESRCH:
+                    # Not running
+                    logging.debug("process %d is not running" % pid)
+                    return False
+                elif e.errno == errno.EPERM:
+                    # No permission to signal this process!
+                    logging.debug("can't deliver signal to process %d" % pid)
+                    return pid
             else:
                 return pid
 
@@ -1077,15 +1088,17 @@ def main():
 
     logging.info('bup-cron %s starting' % __version__)
     try:
+        initialised = False
         if not os.path.exists(os.environ['BUP_DIR']):
             if not Bup.init(args.remote):
                 bail(3, timer, 'failed to initialize bup repo')
-        else:
-            if args.clear:
+            initialised = True
+
+        with Pidfile(args.pidfile):
+            if args.clear and not initialised:
                 if not Bup.clear_index():
                     logging.warning('failed to clear the index')
 
-        with Pidfile(args.pidfile):
             success = process(args)
     except SystemExit:
         return
