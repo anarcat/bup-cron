@@ -86,10 +86,12 @@ class ArgumentConfigParser(argparse.ArgumentParser):
                            help="""the directory to backup to, defaults
                                   to $BUP_DIR (%s)"""
                            % defdir)
-        # using the hostname as branch name
-        group.add_argument('-n', '--name', default=socket.gethostname(),
-                           help="""name of the backup passed to bup,
-                                   defaults to hostname (%(default)s)""")
+        group.add_argument('-n', '--name', default=None,
+                           help="""base of the branch name passed to bup,
+                                   defaults to the hostname""")
+        group.add_argument('-b', '--branch-name', default=None,
+                           help="""full name of the branch name passed to bup,
+                                   overrides --name""")
         group.add_argument('-r', '--remote', default=None,
                            help="""a SSH address to save the backup remotely
                            (example: bup@example.com:repos/repo.bup)""")
@@ -186,10 +188,10 @@ tries to be silent if not specified.
             return ['--' + arg_line]
 
     def parse_args(self):
-        """process argument list
+        """Process arguments list
 
-        inject system and user config files and cleanup various
-        arguments and defaults that couldn't be done otherwise"""
+        Inject system and user config files and cleanup various
+        arguments and defaults that couldn't be done otherwise."""
         configs = map(lambda x: os.path.expanduser(x), self.configs)
         for conf in configs:
             try:
@@ -204,6 +206,10 @@ tries to be silent if not specified.
             self.exit(0, __version__ + "\n")
         if 'BUP_DIR' not in os.environ and not args.repository:
             self.error('argument -d/--repository is required')
+
+        if args.name and args.branch_name:
+            self.error('The options --name and --branch-name cannot '
+                       'be used together.')
 
         # merge the path and paths arguments
         if args.path:
@@ -829,7 +835,7 @@ even in info and debug
                 logging.debug('configured file output to %s, level %s' % (args.logfile, fh.level))
 
     def check_call(self, cmd):
-        """call a procss, log it to the logfile
+        """call a process, log it to the logfile
 
         return false if it fails, otherwise true"""
         try:
@@ -1041,7 +1047,11 @@ def process(args):
                 success = False
                 continue
 
-            branch = '%s-%s' % (args.name, snapshot.src_path.replace('/', '_'))
+            if args.branch_name:
+                branch = args.branch_name
+            else:
+                branch = '%s-%s' % (args.name if args.name else socket.gethostname(),
+                                    snapshot.src_path.replace('/', '_'))
             if not Bup.save([snapshot.path], branch, snapshot.path, args.remote):
                 logging.error('bup save failed on %s' % snapshot.path)
                 success = False
