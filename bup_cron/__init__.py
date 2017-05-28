@@ -241,7 +241,7 @@ class Snapshot(object):
                  verbose=0, call=subprocess.check_call, mountpattern=None):
         """initialise the snapshot array
 
-        path is expected to be the root of the filesystem; log and warn are
+        path is expected to be part of the target filesystem; log and warn are
         logging utilities; call is a way to call processes that will return
         true on success or false otherwise"""
         self.src_path = path
@@ -297,8 +297,9 @@ class LvmSnapshot(Snapshot):
     def __enter__(self):
         """set the LVM and mount it"""
         self.vg_lv = None
-        if os.path.ismount(self.path):
-            device = self.find_device()
+        mountpoint = self.find_mountpoint()
+        if mountpoint:
+            device = self.find_device(mountpoint)
             if device:
                 # vg, lv
                 self.vg_lv = LvmSnapshot.find_vg_lv(device)
@@ -323,7 +324,8 @@ class LvmSnapshot(Snapshot):
                     if self.call(['mount', '-o', 'ro',
                                   self.device(),
                                   self.mountpoint()]):
-                        self.path = self.mountpoint()
+                        relpath = os.path.relpath(self.path, mountpoint)
+                        self.path = os.path.join(self.mountpoint(), relpath)
                     else:
                         logging.warn("""failed to mount snapshot %s on %s,
 skipping snapshotting"""
@@ -340,18 +342,27 @@ skipping snapshooting"""
                 logging.warn('%s is not a LVM mountpoint, skipping snapshotting'
                              % self.path)
         else:
-            logging.warn('%s is not a mountpoint, skipping snapshotting'
+            logging.warn('Could not find mountpoint for %s, skipping snapshotting'
                          % self.path)
         return self
 
-    def find_device(self):
+    def find_mountpoint(self):
+        path = os.path.realpath(self.path)
+        while not os.path.ismount(path):
+            dirname = os.path.dirname(path)
+            if dirname == path:
+                return None
+            path = dirname
+        return path
+
+    def find_device(self, mountpoint):
         """find device based on mountpoint path
 
         returns the device or False if none found"""
 
         mounts = subprocess.check_output(['mount'])
         try:
-            return re.match(r".*^(/[^ ]*) on %s .*" % self.path, mounts,
+            return re.match(r".*^(/[^ ]*) on %s .*" % mountpoint, mounts,
                             re.MULTILINE | re.DOTALL).group(1)
         except:  # noqa
             return False

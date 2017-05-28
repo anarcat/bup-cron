@@ -157,10 +157,6 @@ mounted on `/media/bup/vg-lv`, where `vg` is the Volume Group name and
 with the `--mountpoint` option. The snapshot size is by default `1GB`
 and can be tuned with the `--size` option.
 
-`bup-cron` doesn't currently guess the snapshot device very well, so
-it's only adapted to snapshotting complete filesystems and will fail
-to snapshot if the given path is not the filesystem mountpoint.
-
 A failure to create the snapshot will not abort the backup but will
 spawn a warning.
 
